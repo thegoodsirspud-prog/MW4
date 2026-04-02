@@ -482,7 +482,7 @@ function calcMidge(wx,height){
 const wxCache={};
 async function fetchWeather(munro){
   if(wxCache[munro.name])return wxCache[munro.name];
-  const url=`https://api.open-meteo.com/v1/forecast?latitude=${munro.lat}&longitude=${munro.lon}&elevation=${munro.height}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,precipitation_probability,wind_gusts_10m&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability,wind_gusts_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset,precipitation_probability_max,wind_gusts_10m_max&wind_speed_unit=mph&temperature_unit=celsius&timezone=Europe%2FLondon&forecast_days=4`;
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${munro.lat}&longitude=${munro.lon}&elevation=${munro.height}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,wind_gusts_10m&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability,wind_gusts_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset,precipitation_probability_max,wind_gusts_10m_max&wind_speed_unit=mph&temperature_unit=celsius&timezone=Europe%2FLondon&forecast_days=4`;
   try{const res=await fetch(url);if(!res.ok)throw 0;const w=await res.json();if(w?.current?.temperature_2m==null)throw 0;wxCache[munro.name]=w;return w;}
   catch{const m=generateMock(munro);wxCache[munro.name]=m;return m;}
 }
@@ -773,59 +773,376 @@ function DailyForecast({daily}){
 }
 
 // ─── Scotland Map View ─────────────────────────────────────────────────────────
-function ScotlandMap({munros,bagged,onSelect}){
+function ScotlandMap({munros,bagged,onSelect,regionFilter}){
   const[hover,setHover]=useState(null);
   const W=400,H=550;
-  const minLat=54.6,maxLat=58.75,minLon=-7.0,maxLon=-1.5;
+  const minLat=54.5,maxLat=58.8,minLon=-7.5,maxLon=-1.3;
   const proj=(lat,lon)=>[((lon-minLon)/(maxLon-minLon))*W,((maxLat-lat)/(maxLat-minLat))*H];
-  // Accurate Scotland mainland coastline traced from OS geographic data
-  const COAST="M362.9,394.9 L351.3,381.7 L348.4,371.1 L320.0,364.5 L277.8,357.8 L290.9,338.0 L306.9,320.7 L296.0,303.5 L310.5,302.2 L323.6,291.6 L330.2,270.4 L344.7,262.4 L349.1,237.2 L357.8,213.4 L365.1,188.2 L378.2,165.7 L360.0,140.5 L327.3,139.2 L293.8,141.8 L269.1,145.8 L235.6,152.4 L212.4,165.7 L218.2,152.4 L234.2,140.5 L219.6,119.3 L261.8,103.4 L261.8,79.5 L269.1,67.6 L283.6,46.4 L285.1,41.1 L285.8,19.9 L274.9,10.6 L250.9,15.9 L210.9,25.2 L187.6,33.1 L165.8,23.9 L152.7,30.5 L145.5,19.9 L141.8,26.5 L138.2,46.4 L136.7,66.3 L134.5,79.5 L133.8,92.8 L123.6,99.4 L120.0,106.0 L112.7,112.7 L120.0,119.3 L132.4,112.7 L138.2,121.9 L120.0,123.3 L109.1,132.5 L98.2,136.5 L87.3,129.9 L87.3,145.8 L87.3,155.1 L101.8,159.0 L112.7,152.4 L109.1,159.0 L94.5,176.3 L90.9,194.8 L107.6,196.1 L96.0,201.4 L93.1,212.0 L90.9,225.3 L83.6,238.6 L84.4,251.8 L81.5,265.1 L58.2,274.3 L76.4,284.9 L101.8,295.5 L109.1,291.6 L105.5,298.2 L136.7,274.3 L130.9,278.3 L110.5,298.2 L110.5,308.8 L99.6,318.1 L101.8,331.3 L94.5,344.6 L105.5,353.9 L109.1,364.5 L114.9,377.7 L98.2,384.3 L94.5,404.2 L101.8,440.0 L116.4,430.7 L134.5,410.8 L134.5,397.6 L145.5,384.3 L154.2,371.1 L161.5,375.1 L165.8,383.0 L156.4,391.0 L156.4,417.5 L154.2,444.0 L149.1,470.5 L138.2,510.2 L156.4,536.7 L189.1,520.8 L229.1,516.9 L261.8,503.6 L287.3,497.0 L305.5,483.7 L323.6,450.6 L341.8,424.1 L352.7,410.8Z";
+  const COAST={
+    mainland:"M354.2,387.6 L343.9,374.8 L340.6,364.5 L316.1,358.1 L278.7,351.7 L292.3,332.6 L304.5,314.7 L294.8,299.3 L307.7,298.0 L319.4,287.8 L326.5,267.3 L338.7,259.7 L343.2,245.6 L341.9,234.1 L347.1,220.0 L349.7,211.0 L353.5,199.5 L356.1,188.0 L364.5,176.5 L368.4,166.3 L365.8,153.5 L351.6,142.0 L322.6,140.7 L292.9,143.3 L271.0,147.1 L241.3,153.5 L223.2,163.7 L214.8,167.6 L225.8,156.0 L230.3,149.7 L240.0,140.7 L234.2,129.2 L227.7,120.2 L251.6,111.3 L264.5,106.2 L269.7,95.9 L265.8,83.1 L271.0,71.6 L278.7,58.8 L283.9,51.2 L285.8,46.0 L285.8,25.6 L280.6,20.5 L276.1,16.6 L254.8,21.7 L219.4,30.7 L203.2,35.8 L198.7,38.4 L179.4,29.4 L167.7,35.8 L161.3,25.6 L158.1,32.0 L154.8,51.2 L157.4,64.0 L153.5,70.3 L151.6,83.1 L151.0,95.9 L141.9,102.3 L138.7,108.7 L132.3,115.1 L140.6,119.0 L149.7,115.1 L154.8,124.1 L138.7,125.3 L130.3,130.5 L129.0,134.3 L119.4,138.1 L109.7,131.7 L106.5,138.1 L109.7,147.1 L111.0,156.0 L122.6,159.9 L132.3,153.5 L129.0,159.9 L121.3,166.3 L116.1,176.5 L112.9,194.4 L127.7,195.7 L117.4,200.8 L114.8,211.0 L112.9,223.8 L116.1,230.2 L106.5,236.6 L107.1,245.6 L109.7,253.3 L104.5,262.2 L96.8,264.8 L88.4,266.0 L82.6,271.2 L93.5,277.6 L100.0,281.4 L119.4,287.8 L125.8,291.6 L129.0,294.2 L153.5,271.2 L148.4,275.0 L135.5,287.8 L130.3,294.2 L130.3,304.4 L125.8,307.0 L120.6,313.4 L122.6,319.8 L122.6,326.2 L117.4,336.4 L125.8,347.9 L129.0,358.1 L134.2,370.9 L129.0,376.0 L122.6,383.7 L116.1,396.5 L114.8,422.1 L122.6,431.0 L130.3,428.5 L135.5,422.1 L147.1,409.3 L151.6,402.9 L154.8,390.1 L158.1,381.2 L161.3,374.8 L169.0,364.5 L172.9,362.0 L175.5,364.5 L180.6,374.8 L171.0,383.7 L172.9,396.5 L171.0,409.3 L166.5,427.2 L169.0,434.9 L163.9,447.7 L164.5,460.5 L154.8,498.8 L161.3,518.0 L171.0,524.4 L187.1,518.0 L200.0,514.2 L219.4,509.1 L235.5,505.2 L251.6,498.8 L264.5,492.4 L287.1,486.0 L303.2,473.3 L316.1,454.1 L323.9,434.9 L335.5,415.7 L345.2,402.9Z",
+    skye:"M85.8,153.5 L77.4,159.9 L67.7,166.3 L60.6,170.1 L50.3,175.2 L58.1,181.6 L69.7,189.3 L72.3,195.7 L71.0,202.1 L77.4,205.9 L83.9,213.6 L90.3,211.0 L96.8,207.2 L101.3,202.1 L103.2,194.4 L96.8,191.9 L93.5,185.5 L88.4,176.5 L93.5,168.8 L89.0,166.3 L91.6,159.9Z",
+    mull:"M100.0,278.8 L93.5,284.0 L87.1,287.8 L80.6,294.2 L76.1,300.6 L80.6,307.0 L93.5,313.4 L101.9,309.5 L106.5,304.4 L109.7,296.7 L106.5,291.6 L111.0,287.8 L106.5,284.0Z",
+    lewis:"M90.3,38.4 L77.4,44.8 L67.7,57.6 L58.1,70.3 L51.6,83.1 L45.2,95.9 L38.7,108.7 L35.5,121.5 L38.7,127.9 L46.5,131.7 L58.1,134.3 L64.5,125.3 L61.3,117.7 L69.7,115.1 L74.2,108.7 L77.4,102.3 L85.2,95.9 L90.3,89.5 L96.8,83.1 L100.0,76.7 L96.8,66.5 L100.0,57.6 L96.8,51.2Z",
+    uists:"M22.6,153.5 L16.1,159.9 L12.9,172.7 L11.6,185.5 L16.1,198.3 L19.4,211.0 L25.8,217.4 L35.5,220.0 L41.9,214.9 L45.2,204.7 L38.7,191.9 L32.3,179.1 L29.0,166.3 L25.8,159.9Z",
+    arran:"M151.6,396.5 L147.1,402.9 L149.7,411.9 L153.5,418.3 L158.1,415.7 L160.0,409.3 L156.1,402.9Z",
+    jura:"M112.9,345.3 L106.5,351.7 L104.5,364.5 L109.7,373.5 L114.8,378.6 L119.4,370.9 L119.4,360.7 L117.4,351.7Z",
+    islay:"M90.3,377.3 L83.9,383.7 L80.6,390.1 L85.2,396.5 L93.5,399.1 L100.0,394.0 L101.9,386.3 L96.8,379.9Z",
+  };
+  const filtered=regionFilter&&regionFilter!=="All"?munros.filter(m=>m.region===regionFilter):munros;
+  const dimmed=regionFilter&&regionFilter!=="All";
   return(
-    <div style={{background:"linear-gradient(180deg,rgba(255,255,255,0.02) 0%,rgba(255,255,255,0.01) 100%)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:16,marginBottom:16}}>
-      <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.5)",marginBottom:12,fontFamily:FF}}>SCOTLAND · ALL 282 MUNROS</div>
+    <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:16,marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.5)",fontFamily:FF}}>SCOTLAND · {filtered.length} MUNROS</div>
+        {dimmed&&<div style={{fontSize:10,color:"rgba(255,255,255,0.35)"}}>{regionFilter}</div>}
+      </div>
       <div style={{position:"relative"}}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:420,display:"block",margin:"0 auto"}}>
-          <defs>
-            <radialGradient id="mapGlow" cx="50%" cy="40%" r="50%"><stop offset="0%" stopColor="rgba(255,255,255,0.04)"/><stop offset="100%" stopColor="transparent"/></radialGradient>
-          </defs>
-          {/* Land fill */}
-          <path d={COAST} fill="url(#mapGlow)" stroke="none"/>
-          <path d={COAST} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.2" strokeLinejoin="round"/>
-          {/* Grid lines */}
-          {[55,56,57,58].map(lat=>{const y=((maxLat-lat)/(maxLat-minLat))*H;return <line key={lat} x1={0} y1={y} x2={W} y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth="0.5"/>;})}
-          {[-6,-5,-4,-3,-2].map(lon=>{const x=((lon-minLon)/(maxLon-minLon))*W;return <line key={lon} x1={x} y1={0} x2={x} y2={H} stroke="rgba(255,255,255,0.03)" strokeWidth="0.5"/>;})}
-          {/* Munro dots */}
-          {munros.map(m=>{
+          {/* Land masses */}
+          {Object.values(COAST).map((d,i)=><path key={i} d={d} fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8" strokeLinejoin="round"/>)}
+          {/* All munros as dim dots when filtering */}
+          {dimmed&&munros.map(m=>{const[x,y]=proj(m.lat,m.lon);return <circle key={"bg-"+m.name} cx={x} cy={y} r={1.5} fill="rgba(255,255,255,0.08)"/>;})}
+          {/* Active munro dots — solid, no gradient, high contrast */}
+          {filtered.map(m=>{
             const[x,y]=proj(m.lat,m.lon);
             const isBagged=bagged[m.name];
             const isHover=hover===m.name;
-            return <circle key={m.name} cx={x} cy={y} r={isHover?5:2.5}
-              fill={isBagged?"#22c55e":isHover?"#fff":"rgba(255,255,255,0.45)"}
-              stroke={isBagged?"#22c55e44":isHover?"rgba(255,255,255,0.6)":"none"} strokeWidth={isHover?2:0}
+            return <circle key={m.name} cx={x} cy={y} r={isHover?6:3}
+              fill={isBagged?"#22c55e":"#e2e8f0"}
+              stroke={isHover?"#fff":isBagged?"#166534":"#475569"} strokeWidth={isHover?2:0.8}
               style={{cursor:"pointer",transition:"all .15s"}}
               onClick={()=>onSelect(m)}
               onMouseEnter={()=>setHover(m.name)}
               onMouseLeave={()=>setHover(null)}
             />;
           })}
+          {/* Lomond Hills — red markers */}
+          {LOMOND_HILLS.map(lh=>{
+            const[x,y]=proj(lh.lat,lh.lon);
+            const isHover=hover===lh.name;
+            return <circle key={"lh-"+lh.name} cx={x} cy={y} r={isHover?7:4}
+              fill="#ef4444" stroke={isHover?"#fff":"#7f1d1d"} strokeWidth={isHover?2:1}
+              style={{cursor:"pointer",transition:"all .15s"}}
+              onClick={()=>onSelect(lh)}
+              onMouseEnter={()=>setHover(lh.name)}
+              onMouseLeave={()=>setHover(null)}
+            />;
+          })}
         </svg>
-        {/* Tooltip */}
         {hover&&(()=>{
-          const m=munros.find(x=>x.name===hover);if(!m)return null;
-          const[x,y]=proj(m.lat,m.lon);
-          const isBagged=bagged[m.name];
-          return(
-            <div style={{position:"absolute",left:`${(x/W)*100}%`,top:`${(y/H)*100}%`,transform:"translate(-50%,-120%)",background:"rgba(0,0,0,0.85)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,padding:"6px 10px",pointerEvents:"none",whiteSpace:"nowrap",zIndex:10}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:0.5}}>{isBagged&&<span style={{color:"#22c55e"}}>✓ </span>}{m.name}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.5)"}}>{m.height}m · {m.region}</div>
-            </div>
-          );
+          const m=munros.find(x=>x.name===hover)||LOMOND_HILLS.find(x=>x.name===hover);if(!m)return null;
+          const[x,y]=proj(m.lat,m.lon);const isBagged=bagged[m.name];const isLomond=LOMOND_HILLS.some(l=>l.name===m.name);
+          return(<div style={{position:"absolute",left:`${(x/W)*100}%`,top:`${(y/H)*100}%`,transform:"translate(-50%,-130%)",background:"rgba(0,0,0,0.92)",border:`1px solid ${isLomond?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.25)"}`,borderRadius:8,padding:"6px 10px",pointerEvents:"none",whiteSpace:"nowrap",zIndex:10}}>
+            <div style={{fontSize:11,fontWeight:800,color:isLomond?"#ef4444":"#fff",textTransform:"uppercase",letterSpacing:0.5}}>{isBagged&&<span style={{color:"#22c55e"}}>✓ </span>}{m.name}</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.5)"}}>{m.height}m · {m.region||"Fife"}{isLomond?" · NEXT ADVENTURE":""}</div>
+          </div>);
         })()}
       </div>
-      <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"rgba(255,255,255,0.45)"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Not climbed</span></div>
-        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Bagged</span></div>
-        <div style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>Tap a peak to view</div>
+      <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"#e2e8f0",border:"1px solid #475569"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Not climbed</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",border:"1px solid #166534"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Bagged</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",border:"1px solid #7f1d1d"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Next adventure</span></div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Wind Grid Fetch (Open-Meteo multi-location) ─────────────────────────────
+const WGRID_LATS=[55.0,55.5,56.0,56.5,57.0,57.5,58.0,58.5];
+const WGRID_LONS=[-7.0,-6.0,-5.0,-4.0,-3.0,-2.0];
+let _windCache={d:null,t:0};
+async function fetchWindGrid(){
+  if(_windCache.d&&Date.now()-_windCache.t<600000)return _windCache.d;
+  try{
+    const res=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WGRID_LATS.join(",")}&longitude=${WGRID_LONS.join(",")}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`);
+    const json=await res.json();
+    const arr=Array.isArray(json)?json:[json];
+    const g=[];let i=0;
+    for(const lat of WGRID_LATS)for(const lon of WGRID_LONS){
+      const r=arr[i++];
+      if(r?.current)g.push({lat,lon,spd:r.current.wind_speed_10m||0,dir:r.current.wind_direction_10m||0});
+    }
+    _windCache={d:g,t:Date.now()};return g;
+  }catch{
+    // deterministic fallback
+    const g=[];
+    for(const lat of WGRID_LATS)for(const lon of WGRID_LONS){
+      const s=Math.abs(Math.sin(lat*10+lon*7));
+      g.push({lat,lon,spd:8+s*20,dir:Math.round(s*360)%360});
+    }
+    return g;
+  }
+}
+function interpWind(grid,lat,lon){
+  let ws=0,dx=0,dy=0;
+  for(const g of grid){const d=Math.sqrt((g.lat-lat)**2+(g.lon-lon)**2)+0.01,w=1/(d*d);
+    const r=g.dir*Math.PI/180;dx+=Math.sin(r)*g.spd*w;dy-=Math.cos(r)*g.spd*w;ws+=w;}
+  return{dx:dx/ws,dy:dy/ws,spd:Math.sqrt((dx/ws)**2+(dy/ws)**2)};
+}
+
+// ─── Wind Flow Map — full-screen overlay with animated particles + zoom ───────
+function WindFlowMap({onClose}){
+  const canvasRef=useRef(null);
+  const[grid,setGrid]=useState(null);
+  const[zoom,setZoom]=useState(1);
+  const[pan,setPan]=useState({x:0,y:0});
+  const[dragging,setDragging]=useState(false);
+  const dragStart=useRef(null);
+  const animRef=useRef(0);
+  const particlesRef=useRef([]);
+
+  const BW=400,BH=550;
+  const minLat=54.5,maxLat=58.8,minLon=-7.5,maxLon=-1.3;
+  const proj=(lat,lon)=>[((lon-minLon)/(maxLon-minLon))*BW,((maxLat-lat)/(maxLat-minLat))*BH];
+  const unproj=(x,y)=>[maxLat-(y/BH)*(maxLat-minLat),minLon+(x/BW)*(maxLon-minLon)];
+
+  useEffect(()=>{fetchWindGrid().then(g=>setGrid(g));},[]);
+
+  // Particle animation
+  useEffect(()=>{
+    if(!grid||!canvasRef.current)return;
+    const canvas=canvasRef.current;
+    const ctx=canvas.getContext("2d");
+    const dpr=window.devicePixelRatio||1;
+    const rect=canvas.getBoundingClientRect();
+    canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;
+    ctx.scale(dpr,dpr);
+    const cw=rect.width,ch=rect.height;
+    const sx=cw/BW,sy=ch/BH;
+
+    // Init particles
+    const N=300;
+    if(particlesRef.current.length===0){
+      for(let i=0;i<N;i++)particlesRef.current.push({x:Math.random()*BW,y:Math.random()*BH,age:Math.random()*80,maxAge:60+Math.random()*40});
+    }
+    const ps=particlesRef.current;
+
+    let running=true;
+    function frame(){
+      if(!running)return;
+      ctx.fillStyle="rgba(4,4,6,0.08)";
+      ctx.fillRect(0,0,cw,ch);
+
+      for(const p of ps){
+        const[lat,lon]=unproj(p.x,p.y);
+        const w=interpWind(grid,lat,lon);
+        const factor=0.12*zoom;
+        const ox=p.x,oy=p.y;
+        p.x+=w.dx*factor;p.y+=w.dy*factor;
+        p.age++;
+
+        if(p.age>p.maxAge||p.x<0||p.x>BW||p.y<0||p.y>BH){
+          p.x=Math.random()*BW;p.y=Math.random()*BH;p.age=0;p.maxAge=60+Math.random()*40;
+          continue;
+        }
+
+        const life=1-p.age/p.maxAge;
+        const spd=w.spd;
+        // Colour by speed: blue(calm) → cyan → white(strong)
+        const t=Math.min(1,spd/40);
+        const r=Math.round(100+155*t);
+        const g=Math.round(160+95*t);
+        const b=255;
+        const a=life*0.7*(0.3+t*0.7);
+
+        ctx.beginPath();
+        ctx.moveTo((ox+pan.x)*sx*zoom,(oy+pan.y)*sy*zoom);
+        ctx.lineTo((p.x+pan.x)*sx*zoom,(p.y+pan.y)*sy*zoom);
+        ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;
+        ctx.lineWidth=(0.5+spd/30)*zoom;
+        ctx.stroke();
+      }
+      animRef.current=requestAnimationFrame(frame);
+    }
+    animRef.current=requestAnimationFrame(frame);
+    return()=>{running=false;cancelAnimationFrame(animRef.current);};
+  },[grid,zoom,pan]);
+
+  // Mouse/touch handlers for pan
+  const onPointerDown=(e)=>{setDragging(true);dragStart.current={x:e.clientX-pan.x,y:e.clientY-pan.y};};
+  const onPointerMove=(e)=>{if(dragging&&dragStart.current)setPan({x:e.clientX-dragStart.current.x,y:e.clientY-dragStart.current.y});};
+  const onPointerUp=()=>{setDragging(false);dragStart.current=null;};
+
+  const COAST_M="M354.2,387.6 L343.9,374.8 L340.6,364.5 L316.1,358.1 L278.7,351.7 L292.3,332.6 L304.5,314.7 L294.8,299.3 L307.7,298.0 L319.4,287.8 L326.5,267.3 L338.7,259.7 L343.2,245.6 L341.9,234.1 L347.1,220.0 L349.7,211.0 L353.5,199.5 L356.1,188.0 L364.5,176.5 L368.4,166.3 L365.8,153.5 L351.6,142.0 L322.6,140.7 L292.9,143.3 L271.0,147.1 L241.3,153.5 L223.2,163.7 L214.8,167.6 L225.8,156.0 L230.3,149.7 L240.0,140.7 L234.2,129.2 L227.7,120.2 L251.6,111.3 L264.5,106.2 L269.7,95.9 L265.8,83.1 L271.0,71.6 L278.7,58.8 L283.9,51.2 L285.8,46.0 L285.8,25.6 L280.6,20.5 L276.1,16.6 L254.8,21.7 L219.4,30.7 L203.2,35.8 L198.7,38.4 L179.4,29.4 L167.7,35.8 L161.3,25.6 L158.1,32.0 L154.8,51.2 L157.4,64.0 L153.5,70.3 L151.6,83.1 L151.0,95.9 L141.9,102.3 L138.7,108.7 L132.3,115.1 L140.6,119.0 L149.7,115.1 L154.8,124.1 L138.7,125.3 L130.3,130.5 L129.0,134.3 L119.4,138.1 L109.7,131.7 L106.5,138.1 L109.7,147.1 L111.0,156.0 L122.6,159.9 L132.3,153.5 L129.0,159.9 L121.3,166.3 L116.1,176.5 L112.9,194.4 L127.7,195.7 L117.4,200.8 L114.8,211.0 L112.9,223.8 L116.1,230.2 L106.5,236.6 L107.1,245.6 L109.7,253.3 L104.5,262.2 L96.8,264.8 L88.4,266.0 L82.6,271.2 L93.5,277.6 L100.0,281.4 L119.4,287.8 L125.8,291.6 L129.0,294.2 L153.5,271.2 L148.4,275.0 L135.5,287.8 L130.3,294.2 L130.3,304.4 L125.8,307.0 L120.6,313.4 L122.6,319.8 L122.6,326.2 L117.4,336.4 L125.8,347.9 L129.0,358.1 L134.2,370.9 L129.0,376.0 L122.6,383.7 L116.1,396.5 L114.8,422.1 L122.6,431.0 L130.3,428.5 L135.5,422.1 L147.1,409.3 L151.6,402.9 L154.8,390.1 L158.1,381.2 L161.3,374.8 L169.0,364.5 L172.9,362.0 L175.5,364.5 L180.6,374.8 L171.0,383.7 L172.9,396.5 L171.0,409.3 L166.5,427.2 L169.0,434.9 L163.9,447.7 L164.5,460.5 L154.8,498.8 L161.3,518.0 L171.0,524.4 L187.1,518.0 L200.0,514.2 L219.4,509.1 L235.5,505.2 L251.6,498.8 L264.5,492.4 L287.1,486.0 L303.2,473.3 L316.1,454.1 L323.9,434.9 L335.5,415.7 L345.2,402.9Z";
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(4,4,6,0.97)",zIndex:100,display:"flex",flexDirection:"column",fontFamily:FF}}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",flexShrink:0}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.5)"}}>LIVE WIND FLOW</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:2}}>Animated from Open-Meteo grid data</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>setZoom(z=>Math.min(3,z+0.3))} style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"#fff",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          <button onClick={()=>{setZoom(z=>Math.max(0.5,z-0.3));setPan({x:0,y:0});}} style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"#fff",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+          <button onClick={onClose} style={{padding:"8px 16px",borderRadius:8,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:600}}>✕ CLOSE</button>
+        </div>
+      </div>
+      {/* Map + canvas */}
+      <div style={{flex:1,position:"relative",overflow:"hidden",cursor:dragging?"grabbing":"grab"}}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
+        {/* SVG coastline underneath */}
+        <svg viewBox={`0 0 ${BW} ${BH}`} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",transform:`scale(${zoom}) translate(${pan.x/zoom}px,${pan.y/zoom}px)`,transformOrigin:"center center",pointerEvents:"none"}}>
+          <path d={COAST_M} fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.35)" strokeWidth={1.2/zoom} strokeLinejoin="round"/>
+        </svg>
+        {/* Canvas for animated particles */}
+        <canvas ref={canvasRef} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}}/>
+        {/* Wind speed legend */}
+        {!grid&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",color:"rgba(255,255,255,0.4)",fontSize:12}}>Loading wind data…</div>}
+      </div>
+      {/* Legend */}
+      <div style={{padding:"12px 20px",display:"flex",alignItems:"center",gap:16,flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(100,160,255,0.6)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>Calm</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(180,220,255,0.7)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>Moderate</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(255,255,255,0.8)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>Strong</span></div>
+        <div style={{marginLeft:"auto",fontSize:9,color:"rgba(255,255,255,0.25)"}}>Zoom {Math.round(zoom*100)}% · Drag to pan</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Weather Overlay Map (wind/gusts/humidity/pressure) ──────────────────────
+function WeatherOverlay({type,onClose}){
+  const[grid,setGrid]=useState(null);
+  const W=400,H=550;
+  const minLat=54.5,maxLat=58.8,minLon=-7.5,maxLon=-1.3;
+  const proj=(lat,lon)=>[((lon-minLon)/(maxLon-minLon))*W,((maxLat-lat)/(maxLat-minLat))*H];
+  const LATS=[55.0,55.5,56.0,56.5,57.0,57.5,58.0,58.5];
+  const LONS=[-7.0,-6.0,-5.0,-4.0,-3.0,-2.0];
+  const varMap={wind:"wind_speed_10m",gusts:"wind_gusts_10m",humidity:"relative_humidity_2m",pressure:"surface_pressure"};
+  const unitMap={wind:"mph",gusts:"mph",humidity:"%",pressure:"hPa"};
+  const colorFn={
+    wind:v=>{const t=Math.min(1,v/50);return`rgba(${Math.round(100+155*t)},${Math.round(180+75*(1-t))},255,${0.5+t*0.4})`;},
+    gusts:v=>{const t=Math.min(1,v/70);return`rgba(255,${Math.round(200-150*t)},${Math.round(100-80*t)},${0.5+t*0.4})`;},
+    humidity:v=>{const t=v/100;return`rgba(${Math.round(60+80*t)},${Math.round(140+80*t)},255,${0.3+t*0.5})`;},
+    pressure:v=>{const t=Math.min(1,Math.max(0,(v-970)/60));return`rgba(${Math.round(100+155*(1-t))},${Math.round(200*t)},${Math.round(100+155*t)},0.6)`;},
+  };
+
+  useEffect(()=>{
+    const v=varMap[type]||"wind_speed_10m";
+    const extra=type==="pressure"?"&current=surface_pressure":`&current=${v}`;
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LATS.join(",")}&longitude=${LONS.join(",")}&wind_speed_unit=mph&timezone=Europe%2FLondon${extra}`)
+      .then(r=>r.json()).then(json=>{
+        const arr=Array.isArray(json)?json:[json];
+        const g=[];let i=0;
+        for(const lat of LATS)for(const lon of LONS){
+          const r=arr[i++];if(r?.current){
+            const val=r.current[v]||0;g.push({lat,lon,val});
+          }
+        }
+        setGrid(g);
+      }).catch(()=>{
+        const g=[];for(const lat of LATS)for(const lon of LONS){
+          const s=Math.abs(Math.sin(lat*10+lon*7));
+          const defaults={wind:10+s*30,gusts:15+s*45,humidity:50+s*45,pressure:990+s*30};
+          g.push({lat,lon,val:defaults[type]||20});
+        }
+        setGrid(g);
+      });
+  },[type]);
+
+  const titles={wind:"WIND SPEED",gusts:"WIND GUSTS",humidity:"HUMIDITY",pressure:"PRESSURE"};
+  const COAST_M="M354.2,387.6 L343.9,374.8 L340.6,364.5 L316.1,358.1 L278.7,351.7 L292.3,332.6 L304.5,314.7 L294.8,299.3 L307.7,298.0 L319.4,287.8 L326.5,267.3 L338.7,259.7 L343.2,245.6 L341.9,234.1 L347.1,220.0 L349.7,211.0 L353.5,199.5 L356.1,188.0 L364.5,176.5 L368.4,166.3 L365.8,153.5 L351.6,142.0 L322.6,140.7 L292.9,143.3 L271.0,147.1 L241.3,153.5 L223.2,163.7 L214.8,167.6 L225.8,156.0 L230.3,149.7 L240.0,140.7 L234.2,129.2 L227.7,120.2 L251.6,111.3 L264.5,106.2 L269.7,95.9 L265.8,83.1 L271.0,71.6 L278.7,58.8 L283.9,51.2 L285.8,46.0 L285.8,25.6 L280.6,20.5 L276.1,16.6 L254.8,21.7 L219.4,30.7 L203.2,35.8 L198.7,38.4 L179.4,29.4 L167.7,35.8 L161.3,25.6 L158.1,32.0 L154.8,51.2 L157.4,64.0 L153.5,70.3 L151.6,83.1 L151.0,95.9 L141.9,102.3 L138.7,108.7 L132.3,115.1 L140.6,119.0 L149.7,115.1 L154.8,124.1 L138.7,125.3 L130.3,130.5 L129.0,134.3 L119.4,138.1 L109.7,131.7 L106.5,138.1 L109.7,147.1 L111.0,156.0 L122.6,159.9 L132.3,153.5 L129.0,159.9 L121.3,166.3 L116.1,176.5 L112.9,194.4 L127.7,195.7 L117.4,200.8 L114.8,211.0 L112.9,223.8 L116.1,230.2 L106.5,236.6 L107.1,245.6 L109.7,253.3 L104.5,262.2 L96.8,264.8 L88.4,266.0 L82.6,271.2 L93.5,277.6 L100.0,281.4 L119.4,287.8 L125.8,291.6 L129.0,294.2 L153.5,271.2 L148.4,275.0 L135.5,287.8 L130.3,294.2 L130.3,304.4 L125.8,307.0 L120.6,313.4 L122.6,319.8 L122.6,326.2 L117.4,336.4 L125.8,347.9 L129.0,358.1 L134.2,370.9 L129.0,376.0 L122.6,383.7 L116.1,396.5 L114.8,422.1 L122.6,431.0 L130.3,428.5 L135.5,422.1 L147.1,409.3 L151.6,402.9 L154.8,390.1 L158.1,381.2 L161.3,374.8 L169.0,364.5 L172.9,362.0 L175.5,364.5 L180.6,374.8 L171.0,383.7 L172.9,396.5 L171.0,409.3 L166.5,427.2 L169.0,434.9 L163.9,447.7 L164.5,460.5 L154.8,498.8 L161.3,518.0 L171.0,524.4 L187.1,518.0 L200.0,514.2 L219.4,509.1 L235.5,505.2 L251.6,498.8 L264.5,492.4 L287.1,486.0 L303.2,473.3 L316.1,454.1 L323.9,434.9 L335.5,415.7 L345.2,402.9Z";
+  const cfn=colorFn[type]||colorFn.wind;
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(4,4,6,0.97)",zIndex:100,display:"flex",flexDirection:"column",fontFamily:FF}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",flexShrink:0}}>
+        <div><div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.5)"}}>{titles[type]||"WEATHER"} MAP</div><div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:2}}>Live data from Open-Meteo</div></div>
+        <button onClick={onClose} style={{padding:"8px 16px",borderRadius:8,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:600}}>✕ CLOSE</button>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:420}}>
+          <path d={COAST_M} fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeLinejoin="round"/>
+          {grid&&grid.map((g,i)=>{
+            const[x,y]=proj(g.lat,g.lon);
+            const col=cfn(g.val);
+            const r=12+Math.min(20,g.val/(type==="pressure"?50:3));
+            return <g key={i}>
+              <circle cx={x} cy={y} r={r} fill={col} opacity="0.6"/>
+              <text x={x} y={y+3.5} fill="#fff" fontSize="9" textAnchor="middle" fontWeight="700">{Math.round(g.val)}</text>
+            </g>;
+          })}
+          {!grid&&<text x={W/2} y={H/2} fill="rgba(255,255,255,0.3)" fontSize="12" textAnchor="middle">Loading…</text>}
+        </svg>
+      </div>
+      <div style={{padding:"12px 20px",fontSize:10,color:"rgba(255,255,255,0.3)",textAlign:"center",flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+        Values in {unitMap[type]||""} · Grid resolution ~0.5° · Tap ✕ to close
+      </div>
+    </div>
+  );
+}
+
+// ─── Lomond Hills Forecast + Countdown ───────────────────────────────────────
+const LOMOND_HILLS=[
+  {name:"West Lomond",height:522,lat:56.234,lon:-3.291,region:"Fife"},
+  {name:"East Lomond",height:448,lat:56.243,lon:-3.215,region:"Fife"},
+];
+function LomondSection({onSelect}){
+  const{useFahrenheit}=useTempUnit();
+  const[wx,setWx]=useState([null,null]);
+  const[countdown,setCountdown]=useState("");
+
+  useEffect(()=>{
+    LOMOND_HILLS.forEach((hill,i)=>{
+      const url=`https://api.open-meteo.com/v1/forecast?latitude=${hill.lat}&longitude=${hill.lon}&elevation=${hill.height}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,surface_pressure&wind_speed_unit=mph&temperature_unit=celsius&timezone=Europe%2FLondon`;
+      fetch(url).then(r=>r.json()).then(d=>{
+        if(d?.error){console.warn("Lomond API error:",d.reason);return;}
+        if(d?.current)setWx(prev=>{const n=[...prev];n[i]=d.current;return n;});
+      }).catch(e=>console.warn("Lomond fetch failed:",e));
+    });
+  },[]);
+
+  useEffect(()=>{
+    const target=new Date("2026-04-06T10:00:00+01:00").getTime();
+    const tick=()=>{
+      const diff=target-Date.now();
+      if(diff<=0){setCountdown("LET'S GO!");return;}
+      const d=Math.floor(diff/86400000);
+      const h=Math.floor((diff%86400000)/3600000);
+      const m=Math.floor((diff%3600000)/60000);
+      const s=Math.floor((diff%60000)/1000);
+      setCountdown(d>0?`${d}d ${h}h ${m}m ${s}s`:`${h}h ${m}m ${s}s`);
+    };
+    tick();const iv=setInterval(tick,1000);return()=>clearInterval(iv);
+  },[]);
+
+  return(
+    <div style={{marginBottom:20}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:"#ef4444"}}/>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"#ef4444",fontFamily:FF}}>NEXT ADVENTURE</div>
+        </div>
+        <div style={{fontSize:12,fontWeight:800,color:"#ef4444",letterSpacing:1,fontFamily:FF,fontVariantNumeric:"tabular-nums"}}>{countdown}</div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {LOMOND_HILLS.map((hill,i)=>{
+          const w=wx[i];
+          const wmo=w?WMO[w.weather_code]||{label:"?"}:{label:"—"};
+          const temp=w?(useFahrenheit?`${toF(w.temperature_2m)}°F`:`${Math.round(w.temperature_2m)}°C`):"—";
+          return(
+            <div key={hill.name} onClick={()=>onSelect({...hill,_wxPreload:w})}
+              style={{background:"linear-gradient(135deg,rgba(239,68,68,0.08) 0%,rgba(255,255,255,0.02) 100%)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:14,padding:"12px 14px",cursor:"pointer",transition:"all .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(239,68,68,0.5)"}
+              onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(239,68,68,0.2)"}>
+              <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:"#ef4444",marginBottom:4,textTransform:"uppercase",fontFamily:FF}}>{hill.name}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginBottom:6}}>{hill.height}m · Fife</div>
+              {w?(
+                <>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                    <WeatherIcon code={w.weather_code??3} size={20}/>
+                    <div style={{fontSize:22,fontWeight:900,color:"#fff"}}>{temp}</div>
+                  </div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{wmo.label}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",marginTop:2}}>{Math.round(w.wind_speed_10m||0)} mph {windDir(w.wind_direction_10m||0)} · gusts {Math.round(w.wind_gusts_10m||0)}</div>
+                </>
+              ):(
+                <div style={{height:40,background:"rgba(255,255,255,0.05)",borderRadius:8,animation:"pulse 1.5s ease-in-out infinite"}}/>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -834,7 +1151,7 @@ function ScotlandMap({munros,bagged,onSelect}){
 // ─── Detail page ───────────────────────────────────────────────────────────────
 function DetailPage({munro,onBack,bagged,onToggleBag}){
   const[data,setData]=useState(null);const[loading,setLoading]=useState(true);
-  const[tab,setTab]=useState("hourly");const[showRisk,setShowRisk]=useState(false);const[showMidge,setShowMidge]=useState(false);
+  const[tab,setTab]=useState("hourly");const[showRisk,setShowRisk]=useState(false);const[showMidge,setShowMidge]=useState(false);const[showWindMap,setShowWindMap]=useState(false);const[showOverlay,setShowOverlay]=useState(null);
   const{useFahrenheit}=useTempUnit();
   useEffect(()=>{setLoading(true);setData(null);setTab("hourly");setShowRisk(false);setShowMidge(false);fetchWeather(munro).then(d=>{setData(d);setLoading(false);});},[munro.name]);
   const cur=data?.current||{};const wmo=WMO[cur.weather_code]||{label:"Unknown",ds:0};
@@ -851,22 +1168,29 @@ function DetailPage({munro,onBack,bagged,onToggleBag}){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={()=>onToggleBag(munro.name)} style={{background:isBagged?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.07)",border:`1px solid ${isBagged?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.14)"}`,color:isBagged?"#4ade80":"rgba(255,255,255,0.6)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:11,letterSpacing:1,fontFamily:FF,fontWeight:600}}>{isBagged?"✓ BAGGED":"+ BAG IT"}</button>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",letterSpacing:3}}>SUMMIT FORECAST</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.2)",marginTop:1}}>{munro.height}m · {munro.region}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.25)",marginTop:1}}>{munro.height}m · {munro.region}</div>
           </div>
         </div>
       </div>
       <div style={{position:"relative",padding:"20px 24px 0"}}>
         {loading?<SkeletonLoader/>:data?(
           <>
+            {/* Munro name above temperature — like hero card */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:10,letterSpacing:4,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",marginBottom:3,fontFamily:FF}}>SUMMIT FORECAST</div>
+              <h1 style={{fontSize:munro.name.length>16?18:24,fontWeight:900,margin:"0 0 2px",letterSpacing:1.5,fontFamily:FFS,textTransform:"uppercase"}}>{munro.name}</h1>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.5)"}}>{munro.height}m · {munro.region}</div>
+            </div>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
               <div><TempDisplay celsius={cur.temperature_2m??0} big style={{marginBottom:6}}/><div style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:16}}>{wmo.label} · Feels {feelsPri} / {feelsSec}</div></div>
-              <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3,marginTop:6}}>
+              <div onClick={()=>setShowWindMap(true)} style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3,marginTop:6,cursor:"pointer"}} title="Tap to view live wind flow map">
                 <div style={{transform:"scale(1.5)",transformOrigin:"center top",marginBottom:8}}><WindCompass dir={cur.wind_direction_10m||0}/></div>
                 <div style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.7)",letterSpacing:0.5}}>{Math.round(cur.wind_speed_10m||0)} mph</div>
                 <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:1.5,fontWeight:600}}>gusts {Math.round(cur.wind_gusts_10m||0)}</div>
+                <div style={{fontSize:7,color:"#60a5fa",letterSpacing:1,marginTop:2}}>TAP FOR WIND MAP</div>
               </div>
             </div>
+            {showWindMap&&<WindFlowMap onClose={()=>setShowWindMap(false)}/>}
             <div style={{marginBottom:16}}>
               <RiskBar band={risk.band} score={risk.score} large/>
               <button onClick={()=>setShowRisk(v=>!v)} style={{marginTop:8,background:"none",border:"none",color:acc,fontSize:11,cursor:"pointer",letterSpacing:1,padding:0,fontWeight:600,fontFamily:FF}}>{showRisk?"▲ HIDE RISK BREAKDOWN":"▼ HOW IS RISK CALCULATED?"}</button>
@@ -885,19 +1209,21 @@ function DetailPage({munro,onBack,bagged,onToggleBag}){
               {showMidge&&<MidgePanel wx={cur} height={munro.height}/>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
-              {[{label:"WIND",value:`${Math.round(cur.wind_speed_10m||0)}`,unit:"mph"},{label:"GUSTS",value:`${Math.round(cur.wind_gusts_10m||0)}`,unit:"mph"},{label:"HUMIDITY",value:`${cur.relative_humidity_2m||0}`,unit:"%"},{label:"PRESSURE",value:`${Math.round(cur.surface_pressure||0)}`,unit:"hPa"}].map(s=>(
-                <div key={s.label} style={{background:"linear-gradient(145deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.02) 100%)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
+              {[{label:"WIND",value:`${Math.round(cur.wind_speed_10m||0)}`,unit:"mph",type:"wind"},{label:"GUSTS",value:`${Math.round(cur.wind_gusts_10m||0)}`,unit:"mph",type:"gusts"},{label:"HUMIDITY",value:`${cur.relative_humidity_2m||0}`,unit:"%",type:"humidity"},{label:"PRESSURE",value:`${Math.round(cur.surface_pressure||0)}`,unit:"hPa",type:"pressure"}].map(s=>(
+                <div key={s.label} onClick={()=>s.type==="wind"||s.type==="gusts"?setShowWindMap(true):setShowOverlay(s.type)} style={{background:"linear-gradient(145deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.02) 100%)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:12,padding:"11px 8px",textAlign:"center",cursor:"pointer",transition:"all .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.25)"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.09)"}>
                   <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:1.5,marginBottom:4}}>{s.label}</div>
                   <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{s.value}<span style={{fontSize:10,fontWeight:400,color:"rgba(255,255,255,0.35)"}}>{s.unit}</span></div>
+                  <div style={{fontSize:7,color:"#60a5fa",letterSpacing:0.5,marginTop:3}}>TAP FOR MAP</div>
                 </div>
               ))}
             </div>
+            {showOverlay&&<WeatherOverlay type={showOverlay} onClose={()=>setShowOverlay(null)}/>}
           </>
         ):<div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)"}}>No data available</div>}
       </div>
       <div style={{padding:"0 24px"}}>
-        <h1 style={{fontSize:munro.name.length>16?18:26,fontWeight:900,margin:"0 0 2px",letterSpacing:2,color:"rgba(255,255,255,0.9)",fontFamily:FFS,textTransform:"uppercase"}}>{munro.name}</h1>
-        <div style={{fontSize:11,color:"rgba(255,255,255,0.28)",letterSpacing:2,marginBottom:8}}>{munro.height}m ABOVE SEA LEVEL</div>
         <div style={{height:130,width:"100%"}}><MountainSVG name={munro.name} w={500} h={130} accent={acc+"cc"}/></div>
       </div>
       {data&&<>
@@ -939,7 +1265,7 @@ function MunroCardWithCallback({munro,onClick,onWeatherLoaded,bagged}){
 
 // ─── Hero card ─────────────────────────────────────────────────────────────────
 function HeroCard({munro,onDetail,showRisk,onToggleRisk}){
-  const[wx,setWx]=useState(null);const[loading,setLoading]=useState(true);const[showMidge,setShowMidge]=useState(false);
+  const[wx,setWx]=useState(null);const[loading,setLoading]=useState(true);const[showMidge,setShowMidge]=useState(false);const[showWindMap,setShowWindMap]=useState(false);
   const{useFahrenheit,toggle}=useTempUnit();
   useEffect(()=>{setLoading(true);fetchWeather(munro).then(d=>{setWx(d?.current);setLoading(false);});},[munro.name]);
   const wmo=wx?(WMO[wx.weather_code]||{label:"Unknown"}):null;
@@ -968,12 +1294,14 @@ function HeroCard({munro,onDetail,showRisk,onToggleRisk}){
                 <div style={{fontSize:14,color:"rgba(255,255,255,0.8)",letterSpacing:2,textTransform:"uppercase",fontWeight:600}}>{wmo?.label}</div>
               </div>
             </div>
-            <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3,marginTop:8}}>
+            <div onClick={()=>setShowWindMap(true)} style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3,marginTop:8,cursor:"pointer"}} title="Tap to view live wind flow map">
               <div style={{transform:"scale(1.5)",transformOrigin:"center top",marginBottom:8}}><WindCompass dir={wx.wind_direction_10m||0}/></div>
               <div style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.7)",letterSpacing:0.5}}>{Math.round(wx.wind_speed_10m||0)} mph</div>
               <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:1.5,fontWeight:600}}>gusts {Math.round(wx.wind_gusts_10m||0)}</div>
+              <div style={{fontSize:7,color:"#60a5fa",letterSpacing:1,marginTop:2}}>TAP FOR WIND MAP</div>
             </div>
           </div>
+          {showWindMap&&<WindFlowMap onClose={()=>setShowWindMap(false)}/>}
           <div style={{fontSize:10,letterSpacing:1.5,color:"rgba(255,255,255,0.45)",textTransform:"uppercase",marginTop:6,marginBottom:8,fontFamily:FF}}>tap temperature to swap °C / °F</div>
           <div style={{fontSize:13,color:"rgba(255,255,255,0.7)",marginBottom:10}}>Feels {feelsPri} · Gusts {Math.round(wx.wind_gusts_10m||0)} mph</div>
           <RiskBar band={risk.band} score={risk.score} large/>
@@ -1050,10 +1378,12 @@ export default function App(){
         <div style={{position:"relative",zIndex:1,maxWidth:600,margin:"0 auto",padding:"28px 20px 60px"}}>
 
           <div style={{marginBottom:20}}>
-            <div style={{fontSize:10,letterSpacing:4,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",marginBottom:4}}>Scotland · {MUNROS.length} Munros</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <div style={{fontSize:10,letterSpacing:4,color:"rgba(255,255,255,0.5)",textTransform:"uppercase"}}>SCOTLAND</div>
+              {bagCount>0&&<div style={{fontSize:10,fontWeight:700,color:"#22c55e",letterSpacing:1}}>{bagCount}/282 BAGGED</div>}
+            </div>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-              <h1 style={{fontSize:28,fontWeight:900,margin:0,letterSpacing:2,fontFamily:FFS,textTransform:"uppercase"}}>Summit Forecasts</h1>
-              {bagCount>0&&<div style={{fontSize:11,color:"#22c55e",fontWeight:700}}>{bagCount}/282 bagged</div>}
+              <h1 style={{fontSize:26,fontWeight:900,margin:0,letterSpacing:2,fontFamily:FFS,textTransform:"uppercase"}}>Jim's Summit Forecast</h1>
             </div>
           </div>
 
@@ -1080,7 +1410,7 @@ export default function App(){
             </div>
           )}
 
-          {search.length===0&&<HeroCard munro={heroMunro} onDetail={()=>open(heroMunro,"home")} showRisk={showHeroRisk} onToggleRisk={()=>setShowHeroRisk(v=>!v)}/>}
+          {search.length===0&&<><LomondSection onSelect={m=>open(m,"home")}/><HeroCard munro={heroMunro} onDetail={()=>open(heroMunro,"home")} showRisk={showHeroRisk} onToggleRisk={()=>setShowHeroRisk(v=>!v)}/></>}
 
           <div style={{marginTop:28,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
@@ -1110,7 +1440,7 @@ export default function App(){
             {RISK_LABELS.map((l,i)=><div key={l} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:RISK_ACCENT[i]}}/><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>{l}</span></div>)}
           </div>
 
-          {view==="map"?<ScotlandMap munros={MUNROS} bagged={bagged} onSelect={m=>open(m,"home")}/>:null}
+          {view==="map"?<ScotlandMap munros={MUNROS} bagged={bagged} onSelect={m=>open(m,"home")} regionFilter={regionFilter}/>:null}
 
           {view==="list"&&(filteredMunros.length===0?(
             <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(255,255,255,0.4)"}}>
