@@ -6,8 +6,6 @@ if(typeof document!=="undefined"&&!document.getElementById("munro-fonts")){
   const l=document.createElement("link");l.id="munro-fonts";l.rel="stylesheet";l.href=FONT_LINK;document.head.appendChild(l);
   const s=document.createElement("style");s.textContent=`
     @keyframes pulse{0%,100%{opacity:.3}50%{opacity:.75}}
-    @keyframes fogDrift{0%{transform:translateX(-30%)}100%{transform:translateX(30%)}}
-    @keyframes fogDrift2{0%{transform:translateX(20%)}100%{transform:translateX(-25%)}}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     ::-webkit-scrollbar{width:4px;height:4px}
     ::-webkit-scrollbar-track{background:transparent}
@@ -317,48 +315,52 @@ function getTimeTheme(){
 }
 
 // ─── Custom SVG Weather Icons ────────────────────────────────────────────────
-function WeatherIcon({code, size=24}){
-  const s=size, m=s/2, r=s/24;
-  const c = (code===0||code===1) ? "sun" : code===2 ? "partcloud" : code===3 ? "cloud" :
+function WeatherIcon({code, size=24, hour}){
+  const h = hour!=null ? hour : new Date().getHours();
+  const night = h < 6 || h >= 20;
+  const c = (code===0||code===1) ? (night?"moon":"sun") : code===2 ? (night?"nightcloud":"partcloud") : code===3 ? "cloud" :
     (code===45||code===48) ? "fog" : (code>=51&&code<=55) ? "drizzle" :
     (code>=61&&code<=63) ? "rain" : code===65 ? "heavyrain" :
-    (code>=71&&code<=77) ? "snow" : (code>=80&&code<=81) ? "showers" :
+    (code>=71&&code<=77) ? "snow" : (code>=80&&code<=81) ? (night?"nightshowers":"showers") :
     code===82 ? "heavyrain" : (code>=85&&code<=86) ? "snow" :
     (code>=95) ? "thunder" : "cloud";
   return(
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{display:"block"}}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{display:"block"}}>
       {(c==="sun")&&<>
-        <circle cx="12" cy="12" r="4.5" fill="#fbbf24" opacity="0.9"/>
-        <circle cx="12" cy="12" r="3" fill="#fcd34d"/>
+        <circle cx="12" cy="12" r="4.5" fill="#fbbf24" opacity="0.9"/><circle cx="12" cy="12" r="3" fill="#fcd34d"/>
         {[0,45,90,135,180,225,270,315].map(a=>{const rad=a*Math.PI/180;return <line key={a} x1={12+Math.cos(rad)*6.5} y1={12+Math.sin(rad)*6.5} x2={12+Math.cos(rad)*8.5} y2={12+Math.sin(rad)*8.5} stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round" opacity="0.7"/>})}
+      </>}
+      {(c==="moon")&&<>
+        <circle cx="13" cy="11" r="6" fill="#1e293b" opacity="0.3"/>
+        <path d="M15 5a7 7 0 1 0 0 14 5.5 5.5 0 0 1 0-14z" fill="#cbd5e1" opacity="0.8"/>
+        <circle cx="11" cy="10" r="0.5" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="13" cy="14" r="0.3" fill="rgba(255,255,255,0.1)"/>
+        <circle cx="5" cy="6" r="0.5" fill="rgba(255,255,255,0.2)"/><circle cx="19" cy="8" r="0.4" fill="rgba(255,255,255,0.15)"/><circle cx="7" cy="17" r="0.3" fill="rgba(255,255,255,0.12)"/>
       </>}
       {(c==="partcloud")&&<>
         <circle cx="9" cy="9" r="3.5" fill="#fbbf24" opacity="0.7"/>
         {[0,60,120,180,240,300].map(a=>{const rad=a*Math.PI/180;return <line key={a} x1={9+Math.cos(rad)*5} y1={9+Math.sin(rad)*5} x2={9+Math.cos(rad)*6.5} y2={9+Math.sin(rad)*6.5} stroke="#fbbf24" strokeWidth="0.8" strokeLinecap="round" opacity="0.5"/>})}
-        <ellipse cx="14" cy="15" rx="6" ry="3.5" fill="rgba(255,255,255,0.6)"/>
-        <ellipse cx="11" cy="14.5" rx="4" ry="3" fill="rgba(255,255,255,0.5)"/>
+        <ellipse cx="14" cy="15" rx="6" ry="3.5" fill="rgba(255,255,255,0.6)"/><ellipse cx="11" cy="14.5" rx="4" ry="3" fill="rgba(255,255,255,0.5)"/>
+      </>}
+      {(c==="nightcloud")&&<>
+        <path d="M12 4a4 4 0 1 0 0 8 3.2 3.2 0 0 1 0-8z" fill="#cbd5e1" opacity="0.45" transform="translate(-4,-1) scale(0.7)"/>
+        <circle cx="4" cy="5" r="0.4" fill="rgba(255,255,255,0.15)"/><circle cx="18" cy="4" r="0.3" fill="rgba(255,255,255,0.12)"/>
+        <ellipse cx="14" cy="15" rx="6" ry="3.5" fill="rgba(255,255,255,0.5)"/><ellipse cx="11" cy="14.5" rx="4" ry="3" fill="rgba(255,255,255,0.4)"/>
       </>}
       {(c==="cloud")&&<>
-        <ellipse cx="12" cy="14" rx="7" ry="4" fill="rgba(255,255,255,0.5)"/>
-        <ellipse cx="9" cy="13" rx="5" ry="3.5" fill="rgba(255,255,255,0.45)"/>
-        <ellipse cx="15" cy="13.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
+        <ellipse cx="12" cy="14" rx="7" ry="4" fill="rgba(255,255,255,0.5)"/><ellipse cx="9" cy="13" rx="5" ry="3.5" fill="rgba(255,255,255,0.45)"/><ellipse cx="15" cy="13.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
       </>}
-      {(c==="fog")&&<>
-        {[9,12.5,16].map((y,i)=><line key={i} x1={4+i} y1={y} x2={20-i} y2={y} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round"/>)}
-      </>}
+      {(c==="fog")&&<>{[9,12.5,16].map((y,i)=><line key={i} x1={4+i} y1={y} x2={20-i} y2={y} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round"/>)}</>}
       {(c==="drizzle")&&<>
-        <ellipse cx="12" cy="10" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.45)"/>
-        <ellipse cx="9" cy="9.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
+        <ellipse cx="12" cy="10" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.45)"/><ellipse cx="9" cy="9.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
         {[8,12,16].map((x,i)=><line key={i} x1={x} y1={15+i*0.5} x2={x-0.5} y2={17+i*0.5} stroke="#60a5fa" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>)}
       </>}
       {(c==="rain")&&<>
-        <ellipse cx="12" cy="9" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.45)"/>
-        <ellipse cx="9" cy="8.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
+        <ellipse cx="12" cy="9" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.45)"/><ellipse cx="9" cy="8.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
         {[7,10,13,16].map((x,i)=><line key={i} x1={x} y1={14} x2={x-1} y2={18} stroke="#60a5fa" strokeWidth="1.2" strokeLinecap="round" opacity="0.7"/>)}
       </>}
       {(c==="heavyrain")&&<>
-        <ellipse cx="12" cy="8" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.5)"/>
-        <ellipse cx="9" cy="7.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
+        <ellipse cx="12" cy="8" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.5)"/><ellipse cx="9" cy="7.5" rx="4.5" ry="3" fill="rgba(255,255,255,0.4)"/>
         {[6,9,12,15,18].map((x,i)=><line key={i} x1={x} y1={13} x2={x-1.5} y2={19} stroke="#3b82f6" strokeWidth="1.4" strokeLinecap="round" opacity="0.8"/>)}
       </>}
       {(c==="snow")&&<>
@@ -370,6 +372,11 @@ function WeatherIcon({code, size=24}){
         <ellipse cx="14" cy="11" rx="5.5" ry="3" fill="rgba(255,255,255,0.45)"/>
         {[11,14,17].map((x,i)=><line key={i} x1={x} y1={15.5} x2={x-0.8} y2={19} stroke="#60a5fa" strokeWidth="1.1" strokeLinecap="round" opacity="0.6"/>)}
       </>}
+      {(c==="nightshowers")&&<>
+        <path d="M10 4a3 3 0 1 0 0 6 2.4 2.4 0 0 1 0-6z" fill="#cbd5e1" opacity="0.35" transform="translate(-3,0) scale(0.6)"/>
+        <ellipse cx="14" cy="11" rx="5.5" ry="3" fill="rgba(255,255,255,0.45)"/>
+        {[11,14,17].map((x,i)=><line key={i} x1={x} y1={15.5} x2={x-0.8} y2={19} stroke="#60a5fa" strokeWidth="1.1" strokeLinecap="round" opacity="0.6"/>)}
+      </>}
       {(c==="thunder")&&<>
         <ellipse cx="12" cy="8" rx="6.5" ry="3.5" fill="rgba(255,255,255,0.5)"/>
         <path d="M13 12l-2 4h3l-2 5 5-6h-3l2-3z" fill="#fbbf24" opacity="0.9"/>
@@ -378,6 +385,7 @@ function WeatherIcon({code, size=24}){
     </svg>
   );
 }
+
 
 // ─── WMO code map (label + danger score only, icons handled by WeatherIcon) ──
 const WMO = {
@@ -421,14 +429,59 @@ const SILHOUETTES = {
 };
 function proceduralSil(name){
   const s=name.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
-  const sr=(n,lo,hi)=>lo+(Math.abs(Math.sin(s*n+n*127))*10000%1)*(hi-lo);
-  const style=s%5,peakX=80+sr(1,-20,30),peakY=4+sr(2,0,14),pts=[[0,80]];
-  if(style===0)pts.push([peakX-50-sr(3,0,20),75],[peakX-25,55],[peakX-8,25],[peakX,peakY],[peakX+8,22],[peakX+30,52],[peakX+55+sr(4,0,20),74]);
-  else if(style===1)pts.push([peakX-55,72],[peakX-35,48],[peakX-18,22],[peakX-5,peakY+2],[peakX+5,peakY],[peakX+15,peakY+2],[peakX+30,22],[peakX+50,48],[peakX+65,72]);
-  else if(style===2)pts.push([peakX-65,72],[peakX-45,52],[peakX-28,32],[peakX-12,16],[peakX,peakY],[peakX+12,18],[peakX+26,30],[peakX+40,45],[peakX+60,68]);
-  else if(style===3){const s2x=peakX-14-sr(5,0,10);pts.push([peakX-60,72],[peakX-40,52],[s2x-6,22],[s2x,peakY+10],[s2x+6,22],[(s2x+peakX)/2,30],[peakX-4,20],[peakX,peakY],[peakX+4,20],[peakX+30,50],[peakX+55,72]);}
-  else pts.push([peakX-60,72],[peakX-45,52],[peakX-32,36],[peakX-20,20],[peakX-10,12],[peakX-5,8],[peakX,peakY],[peakX+5,10],[peakX+12,6],[peakX+18,12],[peakX+25,22],[peakX+38,40],[peakX+55,60],[peakX+70,74]);
-  pts.push([200,80]);return pts;
+  const rng=(n)=>{const x=Math.sin(s*n+n*127.1)*43758.5453;return x-Math.floor(x);};
+  // Generate ~25-35 points for a smooth natural profile
+  const nPts=25+Math.round(rng(99)*10);
+  const peakPos=0.3+rng(1)*0.35; // peak between 30-65% across
+  const peakH=3+rng(2)*12; // summit height 3-15 (lower = taller mountain)
+  const style=Math.floor(rng(3)*8); // 8 base styles
+  const asymmetry=0.7+rng(4)*0.6; // left vs right steepness
+  const shoulderL=rng(5)>0.5; // left shoulder/subsidiary peak
+  const shoulderR=rng(6)>0.6; // right shoulder
+  const ridgy=rng(7)>0.55; // jagged ridge or smooth dome
+  
+  const pts=[[0,80]];
+  for(let i=1;i<nPts-1;i++){
+    const t=i/(nPts-1); // 0 to 1
+    const x=t*200;
+    // Base shape: gaussian-ish peak
+    const distFromPeak=Math.abs(t-peakPos);
+    const leftW=peakPos*asymmetry;
+    const rightW=(1-peakPos)*(2-asymmetry);
+    const w=t<peakPos?leftW:rightW;
+    const gauss=Math.exp(-(distFromPeak*distFromPeak)/(2*w*w*0.08));
+    
+    // Height: 80 at edges, peakH at summit
+    let y=80-(80-peakH)*gauss;
+    
+    // Add shoulder bumps
+    if(shoulderL){
+      const sPos=peakPos*0.35+rng(8)*0.15;
+      const sDist=Math.abs(t-sPos);
+      const sGauss=Math.exp(-(sDist*sDist)/(2*0.008));
+      y-=(25+rng(9)*15)*sGauss;
+    }
+    if(shoulderR){
+      const sPos=peakPos+0.25+rng(10)*0.2;
+      const sDist=Math.abs(t-sPos);
+      const sGauss=Math.exp(-(sDist*sDist)/(2*0.01));
+      y-=(20+rng(11)*12)*sGauss;
+    }
+    
+    // Add ridge texture (small bumps near summit)
+    if(ridgy&&distFromPeak<0.2){
+      y+=Math.sin(t*50+s)*2*(1-distFromPeak*5);
+    }
+    
+    // Micro-noise for natural feel
+    y+=Math.sin(t*30+s*0.7)*1.2+Math.sin(t*70+s*1.3)*0.5;
+    
+    // Clamp
+    y=Math.max(peakH-2,Math.min(79,y));
+    pts.push([Math.round(x*10)/10,Math.round(y*10)/10]);
+  }
+  pts.push([200,80]);
+  return pts;
 }
 function getSil(name){return SILHOUETTES[name]||proceduralSil(name);}
 
@@ -519,27 +572,13 @@ function MountainSVG({name,w=420,h=120,accent="rgba(255,255,255,0.85)",mini=fals
   const minY=Math.min(...ys),maxY=Math.max(...ys),rY=maxY-minY||1;
   const scaled=pts.map(([x,y])=>[(x/200)*w,((y-minY)/rY)*h]);
   const poly=scaled.map(p=>p.join(",")).join(" ");
-  const threshold=h*0.20;
-  const snowPts=[...scaled.filter(p=>p[1]<=threshold)];
-  if(snowPts.length>1){const f=snowPts[0],l=snowPts[snowPts.length-1];snowPts.push([l[0],threshold],[f[0],threshold]);}
   const seed=name.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
   return(
     <svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:"100%",display:"block"}} preserveAspectRatio="xMidYMax meet">
-      <defs><linearGradient id={`mfg-${seed}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,255,255,0.09)"/><stop offset="100%" stopColor="rgba(255,255,255,0.01)"/></linearGradient></defs>
+      <defs><linearGradient id={`mfg-${seed}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,255,255,0.07)"/><stop offset="100%" stopColor="rgba(255,255,255,0.01)"/></linearGradient></defs>
       <polygon points={poly} fill={`url(#mfg-${seed})`} stroke="none"/>
-      <polyline points={poly} fill="none" stroke={accent} strokeWidth={mini?0.7:1.3} strokeLinejoin="round" strokeLinecap="round"/>
-      {snowPts.length>2&&<polygon points={snowPts.map(p=>p.join(",")).join(" ")} fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.6"/>}
+      <polyline points={poly} fill="none" stroke={accent} strokeWidth={mini?0.6:1} strokeLinejoin="round" strokeLinecap="round"/>
     </svg>
-  );
-}
-
-// ─── Fog overlay for hero ──────────────────────────────────────────────────────
-function FogOverlay(){
-  return(
-    <div style={{position:"absolute",bottom:0,left:0,right:0,height:80,overflow:"hidden",pointerEvents:"none"}}>
-      <div style={{position:"absolute",bottom:-10,left:"-30%",right:"-30%",height:50,background:"radial-gradient(ellipse at center, rgba(255,255,255,0.06) 0%, transparent 70%)",animation:"fogDrift 12s ease-in-out infinite alternate"}}/>
-      <div style={{position:"absolute",bottom:5,left:"-20%",right:"-20%",height:35,background:"radial-gradient(ellipse at 60% center, rgba(255,255,255,0.04) 0%, transparent 70%)",animation:"fogDrift2 16s ease-in-out infinite alternate"}}/>
-    </div>
   );
 }
 
@@ -719,7 +758,7 @@ function HourlyStrip({hourly,current}){
         return(
           <div key={t} style={{flexShrink:0,width:60,background:isNow?"rgba(255,255,255,0.13)":"rgba(255,255,255,0.03)",border:`1px solid ${isNow?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.06)"}`,borderRadius:12,padding:"10px 0",textAlign:"center",animation:isNow?undefined:`fadeIn 0.3s ease ${i*0.03}s both`}}>
             <div style={{fontSize:9,color:isNow?"#fff":"rgba(255,255,255,0.38)",letterSpacing:1,marginBottom:5,fontFamily:FF}}>{isNow?"NOW":formatHour(t)}</div>
-            <div style={{marginBottom:5,display:"flex",justifyContent:"center"}}><WeatherIcon code={wc??3} size={22}/></div>
+            <div style={{marginBottom:5,display:"flex",justifyContent:"center"}}><WeatherIcon code={wc??3} size={22} hour={isNow?new Date().getHours():new Date(t).getHours()}/></div>
             <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:2}}>{dispTemp}</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginBottom:prec>0?2:0}}>
               {wind!=null?`${Math.round(wind)}mph`:""}{gusts!=null&&wind!=null?<span style={{color:"rgba(255,255,255,0.2)"}}> ↑{Math.round(gusts)}</span>:""}
@@ -883,191 +922,125 @@ function interpWind(grid,lat,lon){
 // ─── Wind Flow Map — full-screen overlay with animated particles + zoom ───────
 function WindFlowMap({onClose}){
   const canvasRef=useRef(null);
+  const containerRef=useRef(null);
   const[grid,setGrid]=useState(null);
-  const[zoom,setZoom]=useState(1);
-  const[pan,setPan]=useState({x:0,y:0});
-  const[dragging,setDragging]=useState(false);
-  const dragStart=useRef(null);
   const animRef=useRef(0);
   const particlesRef=useRef([]);
+  const sizeRef=useRef({w:0,h:0});
 
   const BW=400,BH=550;
   const minLat=54.5,maxLat=58.8,minLon=-7.5,maxLon=-1.3;
-  const proj=(lat,lon)=>[((lon-minLon)/(maxLon-minLon))*BW,((maxLat-lat)/(maxLat-minLat))*BH];
   const unproj=(x,y)=>[maxLat-(y/BH)*(maxLat-minLat),minLon+(x/BW)*(maxLon-minLon)];
 
   useEffect(()=>{fetchWindGrid().then(g=>setGrid(g));},[]);
 
-  // Particle animation
+  // Canvas sizing — delay to ensure layout, plus resize observer
+  useEffect(()=>{
+    if(!canvasRef.current||!containerRef.current)return;
+    const setup=()=>{
+      const canvas=canvasRef.current;
+      const cont=containerRef.current;
+      if(!canvas||!cont)return;
+      const rect=cont.getBoundingClientRect();
+      if(rect.width<10||rect.height<10)return; // not laid out yet
+      const dpr=window.devicePixelRatio||1;
+      canvas.width=rect.width*dpr;
+      canvas.height=rect.height*dpr;
+      canvas.style.width=rect.width+"px";
+      canvas.style.height=rect.height+"px";
+      const ctx=canvas.getContext("2d");
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      sizeRef.current={w:rect.width,h:rect.height};
+    };
+    // Try immediately, then retry after layout
+    setup();
+    const t=setTimeout(setup,100);
+    const ro=new ResizeObserver(setup);
+    ro.observe(containerRef.current);
+    return()=>{clearTimeout(t);ro.disconnect();};
+  },[]);
+
+  // Particle animation loop
   useEffect(()=>{
     if(!grid||!canvasRef.current)return;
     const canvas=canvasRef.current;
     const ctx=canvas.getContext("2d");
-    const dpr=window.devicePixelRatio||1;
-    const rect=canvas.getBoundingClientRect();
-    canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;
-    ctx.scale(dpr,dpr);
-    const cw=rect.width,ch=rect.height;
-    const sx=cw/BW,sy=ch/BH;
 
-    // Init particles
-    const N=300;
+    const N=250;
     if(particlesRef.current.length===0){
-      for(let i=0;i<N;i++)particlesRef.current.push({x:Math.random()*BW,y:Math.random()*BH,age:Math.random()*80,maxAge:60+Math.random()*40});
+      for(let i=0;i<N;i++)particlesRef.current.push({x:Math.random()*BW,y:Math.random()*BH,age:Math.random()*80,maxAge:50+Math.random()*50});
     }
     const ps=particlesRef.current;
-
     let running=true;
+
     function frame(){
       if(!running)return;
-      ctx.fillStyle="rgba(4,4,6,0.08)";
+      const{w:cw,h:ch}=sizeRef.current;
+      if(cw<10){animRef.current=requestAnimationFrame(frame);return;}
+      const sx=cw/BW,sy=ch/BH;
+
+      ctx.fillStyle="rgba(4,4,6,0.06)";
       ctx.fillRect(0,0,cw,ch);
 
       for(const p of ps){
         const[lat,lon]=unproj(p.x,p.y);
         const w=interpWind(grid,lat,lon);
-        const factor=0.12*zoom;
+        const speed=w.spd;
+        const factor=0.15;
         const ox=p.x,oy=p.y;
-        p.x+=w.dx*factor;p.y+=w.dy*factor;
+        p.x+=w.dx*factor;
+        p.y+=w.dy*factor;
         p.age++;
 
-        if(p.age>p.maxAge||p.x<0||p.x>BW||p.y<0||p.y>BH){
-          p.x=Math.random()*BW;p.y=Math.random()*BH;p.age=0;p.maxAge=60+Math.random()*40;
+        if(p.age>p.maxAge||p.x<-10||p.x>BW+10||p.y<-10||p.y>BH+10){
+          p.x=Math.random()*BW;p.y=Math.random()*BH;p.age=0;p.maxAge=50+Math.random()*50;
           continue;
         }
 
         const life=1-p.age/p.maxAge;
-        const spd=w.spd;
-        // Colour by speed: blue(calm) → cyan → white(strong)
-        const t=Math.min(1,spd/40);
-        const r=Math.round(100+155*t);
-        const g=Math.round(160+95*t);
+        const t=Math.min(1,speed/35);
+        // Blue(calm) → cyan → white(strong)
+        const r=Math.round(80+175*t);
+        const g=Math.round(150+105*t);
         const b=255;
-        const a=life*0.7*(0.3+t*0.7);
+        const a=life*(0.4+t*0.5);
 
         ctx.beginPath();
-        ctx.moveTo((ox+pan.x)*sx*zoom,(oy+pan.y)*sy*zoom);
-        ctx.lineTo((p.x+pan.x)*sx*zoom,(p.y+pan.y)*sy*zoom);
+        ctx.moveTo(ox*sx,oy*sy);
+        ctx.lineTo(p.x*sx,p.y*sy);
         ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;
-        ctx.lineWidth=(0.5+spd/30)*zoom;
+        ctx.lineWidth=0.8+speed/20;
         ctx.stroke();
       }
       animRef.current=requestAnimationFrame(frame);
     }
     animRef.current=requestAnimationFrame(frame);
     return()=>{running=false;cancelAnimationFrame(animRef.current);};
-  },[grid,zoom,pan]);
-
-  // Mouse/touch handlers for pan
-  const onPointerDown=(e)=>{setDragging(true);dragStart.current={x:e.clientX-pan.x,y:e.clientY-pan.y};};
-  const onPointerMove=(e)=>{if(dragging&&dragStart.current)setPan({x:e.clientX-dragStart.current.x,y:e.clientY-dragStart.current.y});};
-  const onPointerUp=()=>{setDragging(false);dragStart.current=null;};
+  },[grid]);
 
   const COAST_M="M354.2,387.6 L343.9,374.8 L340.6,364.5 L316.1,358.1 L278.7,351.7 L292.3,332.6 L304.5,314.7 L294.8,299.3 L307.7,298.0 L319.4,287.8 L326.5,267.3 L338.7,259.7 L343.2,245.6 L341.9,234.1 L347.1,220.0 L349.7,211.0 L353.5,199.5 L356.1,188.0 L364.5,176.5 L368.4,166.3 L365.8,153.5 L351.6,142.0 L322.6,140.7 L292.9,143.3 L271.0,147.1 L241.3,153.5 L223.2,163.7 L214.8,167.6 L225.8,156.0 L230.3,149.7 L240.0,140.7 L234.2,129.2 L227.7,120.2 L251.6,111.3 L264.5,106.2 L269.7,95.9 L265.8,83.1 L271.0,71.6 L278.7,58.8 L283.9,51.2 L285.8,46.0 L285.8,25.6 L280.6,20.5 L276.1,16.6 L254.8,21.7 L219.4,30.7 L203.2,35.8 L198.7,38.4 L179.4,29.4 L167.7,35.8 L161.3,25.6 L158.1,32.0 L154.8,51.2 L157.4,64.0 L153.5,70.3 L151.6,83.1 L151.0,95.9 L141.9,102.3 L138.7,108.7 L132.3,115.1 L140.6,119.0 L149.7,115.1 L154.8,124.1 L138.7,125.3 L130.3,130.5 L129.0,134.3 L119.4,138.1 L109.7,131.7 L106.5,138.1 L109.7,147.1 L111.0,156.0 L122.6,159.9 L132.3,153.5 L129.0,159.9 L121.3,166.3 L116.1,176.5 L112.9,194.4 L127.7,195.7 L117.4,200.8 L114.8,211.0 L112.9,223.8 L116.1,230.2 L106.5,236.6 L107.1,245.6 L109.7,253.3 L104.5,262.2 L96.8,264.8 L88.4,266.0 L82.6,271.2 L93.5,277.6 L100.0,281.4 L119.4,287.8 L125.8,291.6 L129.0,294.2 L153.5,271.2 L148.4,275.0 L135.5,287.8 L130.3,294.2 L130.3,304.4 L125.8,307.0 L120.6,313.4 L122.6,319.8 L122.6,326.2 L117.4,336.4 L125.8,347.9 L129.0,358.1 L134.2,370.9 L129.0,376.0 L122.6,383.7 L116.1,396.5 L114.8,422.1 L122.6,431.0 L130.3,428.5 L135.5,422.1 L147.1,409.3 L151.6,402.9 L154.8,390.1 L158.1,381.2 L161.3,374.8 L169.0,364.5 L172.9,362.0 L175.5,364.5 L180.6,374.8 L171.0,383.7 L172.9,396.5 L171.0,409.3 L166.5,427.2 L169.0,434.9 L163.9,447.7 L164.5,460.5 L154.8,498.8 L161.3,518.0 L171.0,524.4 L187.1,518.0 L200.0,514.2 L219.4,509.1 L235.5,505.2 L251.6,498.8 L264.5,492.4 L287.1,486.0 L303.2,473.3 L316.1,454.1 L323.9,434.9 L335.5,415.7 L345.2,402.9Z";
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(4,4,6,0.97)",zIndex:100,display:"flex",flexDirection:"column",fontFamily:FF}}>
-      {/* Header */}
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#030308",zIndex:100,display:"flex",flexDirection:"column",fontFamily:FF}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",flexShrink:0}}>
         <div>
-          <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.5)"}}>LIVE WIND FLOW</div>
-          <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:2}}>Animated from Open-Meteo grid data</div>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.6)"}}>LIVE WIND FLOW</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:2}}>{grid?`${grid.length} grid points · Open-Meteo`:"Loading wind data…"}</div>
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>setZoom(z=>Math.min(3,z+0.3))} style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"#fff",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-          <button onClick={()=>{setZoom(z=>Math.max(0.5,z-0.3));setPan({x:0,y:0});}} style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"#fff",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-          <button onClick={onClose} style={{padding:"8px 16px",borderRadius:8,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:600}}>✕ CLOSE</button>
-        </div>
+        <button onClick={onClose} style={{padding:"8px 18px",borderRadius:8,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:600}}>✕ CLOSE</button>
       </div>
-      {/* Map + canvas */}
-      <div style={{flex:1,position:"relative",overflow:"hidden",cursor:dragging?"grabbing":"grab"}}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
-        {/* SVG coastline underneath */}
-        <svg viewBox={`0 0 ${BW} ${BH}`} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",transform:`scale(${zoom}) translate(${pan.x/zoom}px,${pan.y/zoom}px)`,transformOrigin:"center center",pointerEvents:"none"}}>
-          <path d={COAST_M} fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.35)" strokeWidth={1.2/zoom} strokeLinejoin="round"/>
+      <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden"}}>
+        {/* SVG coastline */}
+        <svg viewBox={`0 0 ${BW} ${BH}`} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none"}}>
+          <path d={COAST_M} fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinejoin="round"/>
         </svg>
-        {/* Canvas for animated particles */}
-        <canvas ref={canvasRef} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}}/>
-        {/* Wind speed legend */}
-        {!grid&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",color:"rgba(255,255,255,0.4)",fontSize:12}}>Loading wind data…</div>}
+        {/* Canvas for particles */}
+        <canvas ref={canvasRef} style={{position:"absolute",top:0,left:0}}/>
       </div>
-      {/* Legend */}
-      <div style={{padding:"12px 20px",display:"flex",alignItems:"center",gap:16,flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(100,160,255,0.6)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>Calm</span></div>
-        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(180,220,255,0.7)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>Moderate</span></div>
-        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(255,255,255,0.8)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>Strong</span></div>
-        <div style={{marginLeft:"auto",fontSize:9,color:"rgba(255,255,255,0.25)"}}>Zoom {Math.round(zoom*100)}% · Drag to pan</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Weather Overlay Map (wind/gusts/humidity/pressure) ──────────────────────
-function WeatherOverlay({type,onClose}){
-  const[grid,setGrid]=useState(null);
-  const W=400,H=550;
-  const minLat=54.5,maxLat=58.8,minLon=-7.5,maxLon=-1.3;
-  const proj=(lat,lon)=>[((lon-minLon)/(maxLon-minLon))*W,((maxLat-lat)/(maxLat-minLat))*H];
-  const LATS=[55.0,55.5,56.0,56.5,57.0,57.5,58.0,58.5];
-  const LONS=[-7.0,-6.0,-5.0,-4.0,-3.0,-2.0];
-  const varMap={wind:"wind_speed_10m",gusts:"wind_gusts_10m",humidity:"relative_humidity_2m",pressure:"surface_pressure"};
-  const unitMap={wind:"mph",gusts:"mph",humidity:"%",pressure:"hPa"};
-  const colorFn={
-    wind:v=>{const t=Math.min(1,v/50);return`rgba(${Math.round(100+155*t)},${Math.round(180+75*(1-t))},255,${0.5+t*0.4})`;},
-    gusts:v=>{const t=Math.min(1,v/70);return`rgba(255,${Math.round(200-150*t)},${Math.round(100-80*t)},${0.5+t*0.4})`;},
-    humidity:v=>{const t=v/100;return`rgba(${Math.round(60+80*t)},${Math.round(140+80*t)},255,${0.3+t*0.5})`;},
-    pressure:v=>{const t=Math.min(1,Math.max(0,(v-970)/60));return`rgba(${Math.round(100+155*(1-t))},${Math.round(200*t)},${Math.round(100+155*t)},0.6)`;},
-  };
-
-  useEffect(()=>{
-    const v=varMap[type]||"wind_speed_10m";
-    const extra=type==="pressure"?"&current=surface_pressure":`&current=${v}`;
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LATS.join(",")}&longitude=${LONS.join(",")}&wind_speed_unit=mph&timezone=Europe%2FLondon${extra}`)
-      .then(r=>r.json()).then(json=>{
-        const arr=Array.isArray(json)?json:[json];
-        const g=[];let i=0;
-        for(const lat of LATS)for(const lon of LONS){
-          const r=arr[i++];if(r?.current){
-            const val=r.current[v]||0;g.push({lat,lon,val});
-          }
-        }
-        setGrid(g);
-      }).catch(()=>{
-        const g=[];for(const lat of LATS)for(const lon of LONS){
-          const s=Math.abs(Math.sin(lat*10+lon*7));
-          const defaults={wind:10+s*30,gusts:15+s*45,humidity:50+s*45,pressure:990+s*30};
-          g.push({lat,lon,val:defaults[type]||20});
-        }
-        setGrid(g);
-      });
-  },[type]);
-
-  const titles={wind:"WIND SPEED",gusts:"WIND GUSTS",humidity:"HUMIDITY",pressure:"PRESSURE"};
-  const COAST_M="M354.2,387.6 L343.9,374.8 L340.6,364.5 L316.1,358.1 L278.7,351.7 L292.3,332.6 L304.5,314.7 L294.8,299.3 L307.7,298.0 L319.4,287.8 L326.5,267.3 L338.7,259.7 L343.2,245.6 L341.9,234.1 L347.1,220.0 L349.7,211.0 L353.5,199.5 L356.1,188.0 L364.5,176.5 L368.4,166.3 L365.8,153.5 L351.6,142.0 L322.6,140.7 L292.9,143.3 L271.0,147.1 L241.3,153.5 L223.2,163.7 L214.8,167.6 L225.8,156.0 L230.3,149.7 L240.0,140.7 L234.2,129.2 L227.7,120.2 L251.6,111.3 L264.5,106.2 L269.7,95.9 L265.8,83.1 L271.0,71.6 L278.7,58.8 L283.9,51.2 L285.8,46.0 L285.8,25.6 L280.6,20.5 L276.1,16.6 L254.8,21.7 L219.4,30.7 L203.2,35.8 L198.7,38.4 L179.4,29.4 L167.7,35.8 L161.3,25.6 L158.1,32.0 L154.8,51.2 L157.4,64.0 L153.5,70.3 L151.6,83.1 L151.0,95.9 L141.9,102.3 L138.7,108.7 L132.3,115.1 L140.6,119.0 L149.7,115.1 L154.8,124.1 L138.7,125.3 L130.3,130.5 L129.0,134.3 L119.4,138.1 L109.7,131.7 L106.5,138.1 L109.7,147.1 L111.0,156.0 L122.6,159.9 L132.3,153.5 L129.0,159.9 L121.3,166.3 L116.1,176.5 L112.9,194.4 L127.7,195.7 L117.4,200.8 L114.8,211.0 L112.9,223.8 L116.1,230.2 L106.5,236.6 L107.1,245.6 L109.7,253.3 L104.5,262.2 L96.8,264.8 L88.4,266.0 L82.6,271.2 L93.5,277.6 L100.0,281.4 L119.4,287.8 L125.8,291.6 L129.0,294.2 L153.5,271.2 L148.4,275.0 L135.5,287.8 L130.3,294.2 L130.3,304.4 L125.8,307.0 L120.6,313.4 L122.6,319.8 L122.6,326.2 L117.4,336.4 L125.8,347.9 L129.0,358.1 L134.2,370.9 L129.0,376.0 L122.6,383.7 L116.1,396.5 L114.8,422.1 L122.6,431.0 L130.3,428.5 L135.5,422.1 L147.1,409.3 L151.6,402.9 L154.8,390.1 L158.1,381.2 L161.3,374.8 L169.0,364.5 L172.9,362.0 L175.5,364.5 L180.6,374.8 L171.0,383.7 L172.9,396.5 L171.0,409.3 L166.5,427.2 L169.0,434.9 L163.9,447.7 L164.5,460.5 L154.8,498.8 L161.3,518.0 L171.0,524.4 L187.1,518.0 L200.0,514.2 L219.4,509.1 L235.5,505.2 L251.6,498.8 L264.5,492.4 L287.1,486.0 L303.2,473.3 L316.1,454.1 L323.9,434.9 L335.5,415.7 L345.2,402.9Z";
-  const cfn=colorFn[type]||colorFn.wind;
-  return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(4,4,6,0.97)",zIndex:100,display:"flex",flexDirection:"column",fontFamily:FF}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",flexShrink:0}}>
-        <div><div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:"rgba(255,255,255,0.5)"}}>{titles[type]||"WEATHER"} MAP</div><div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:2}}>Live data from Open-Meteo</div></div>
-        <button onClick={onClose} style={{padding:"8px 16px",borderRadius:8,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:600}}>✕ CLOSE</button>
-      </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:420}}>
-          <path d={COAST_M} fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeLinejoin="round"/>
-          {grid&&grid.map((g,i)=>{
-            const[x,y]=proj(g.lat,g.lon);
-            const col=cfn(g.val);
-            const r=12+Math.min(20,g.val/(type==="pressure"?50:3));
-            return <g key={i}>
-              <circle cx={x} cy={y} r={r} fill={col} opacity="0.6"/>
-              <text x={x} y={y+3.5} fill="#fff" fontSize="9" textAnchor="middle" fontWeight="700">{Math.round(g.val)}</text>
-            </g>;
-          })}
-          {!grid&&<text x={W/2} y={H/2} fill="rgba(255,255,255,0.3)" fontSize="12" textAnchor="middle">Loading…</text>}
-        </svg>
-      </div>
-      <div style={{padding:"12px 20px",fontSize:10,color:"rgba(255,255,255,0.3)",textAlign:"center",flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-        Values in {unitMap[type]||""} · Grid resolution ~0.5° · Tap ✕ to close
+      <div style={{padding:"12px 20px",display:"flex",alignItems:"center",gap:16,flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(80,150,255,0.6)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.4)"}}>Calm</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(180,230,255,0.8)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.4)"}}>Moderate</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:20,height:3,borderRadius:2,background:"rgba(255,255,255,0.9)"}}/><span style={{fontSize:9,color:"rgba(255,255,255,0.4)"}}>Strong</span></div>
       </div>
     </div>
   );
@@ -1151,7 +1124,7 @@ function LomondSection({onSelect}){
 // ─── Detail page ───────────────────────────────────────────────────────────────
 function DetailPage({munro,onBack,bagged,onToggleBag}){
   const[data,setData]=useState(null);const[loading,setLoading]=useState(true);
-  const[tab,setTab]=useState("hourly");const[showRisk,setShowRisk]=useState(false);const[showMidge,setShowMidge]=useState(false);const[showWindMap,setShowWindMap]=useState(false);const[showOverlay,setShowOverlay]=useState(null);
+  const[tab,setTab]=useState("hourly");const[showRisk,setShowRisk]=useState(false);const[showMidge,setShowMidge]=useState(false);const[showWindMap,setShowWindMap]=useState(false);
   const{useFahrenheit}=useTempUnit();
   useEffect(()=>{setLoading(true);setData(null);setTab("hourly");setShowRisk(false);setShowMidge(false);fetchWeather(munro).then(d=>{setData(d);setLoading(false);});},[munro.name]);
   const cur=data?.current||{};const wmo=WMO[cur.weather_code]||{label:"Unknown",ds:0};
@@ -1209,22 +1182,18 @@ function DetailPage({munro,onBack,bagged,onToggleBag}){
               {showMidge&&<MidgePanel wx={cur} height={munro.height}/>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
-              {[{label:"WIND",value:`${Math.round(cur.wind_speed_10m||0)}`,unit:"mph",type:"wind"},{label:"GUSTS",value:`${Math.round(cur.wind_gusts_10m||0)}`,unit:"mph",type:"gusts"},{label:"HUMIDITY",value:`${cur.relative_humidity_2m||0}`,unit:"%",type:"humidity"},{label:"PRESSURE",value:`${Math.round(cur.surface_pressure||0)}`,unit:"hPa",type:"pressure"}].map(s=>(
-                <div key={s.label} onClick={()=>s.type==="wind"||s.type==="gusts"?setShowWindMap(true):setShowOverlay(s.type)} style={{background:"linear-gradient(145deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.02) 100%)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:12,padding:"11px 8px",textAlign:"center",cursor:"pointer",transition:"all .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.25)"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.09)"}>
+              {[{label:"WIND",value:`${Math.round(cur.wind_speed_10m||0)}`,unit:"mph"},{label:"GUSTS",value:`${Math.round(cur.wind_gusts_10m||0)}`,unit:"mph"},{label:"HUMIDITY",value:`${cur.relative_humidity_2m||0}`,unit:"%"},{label:"PRESSURE",value:`${Math.round(cur.surface_pressure||0)}`,unit:"hPa"}].map(s=>(
+                <div key={s.label} style={{background:"linear-gradient(145deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.02) 100%)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
                   <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:1.5,marginBottom:4}}>{s.label}</div>
                   <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{s.value}<span style={{fontSize:10,fontWeight:400,color:"rgba(255,255,255,0.35)"}}>{s.unit}</span></div>
-                  <div style={{fontSize:7,color:"#60a5fa",letterSpacing:0.5,marginTop:3}}>TAP FOR MAP</div>
                 </div>
               ))}
             </div>
-            {showOverlay&&<WeatherOverlay type={showOverlay} onClose={()=>setShowOverlay(null)}/>}
           </>
         ):<div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)"}}>No data available</div>}
       </div>
       <div style={{padding:"0 24px"}}>
-        <div style={{height:130,width:"100%"}}><MountainSVG name={munro.name} w={500} h={130} accent={acc+"cc"}/></div>
+        <div style={{height:130,width:"100%",position:"relative"}}><MountainSVG name={munro.name} w={500} h={130} accent={acc+"cc"}/></div>
       </div>
       {data&&<>
         <div style={{display:"flex",padding:"12px 24px 14px"}}>{[["hourly","HOURLY"],["days","4-DAY OUTLOOK"]].map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"10px 0",background:tab===k?"rgba(255,255,255,0.12)":"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:k==="hourly"?"10px 0 0 10px":"0 10px 10px 0",color:tab===k?"#fff":"rgba(255,255,255,0.35)",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:tab===k?700:400,fontFamily:FF}}>{l}</button>)}</div>
@@ -1323,7 +1292,6 @@ function HeroCard({munro,onDetail,showRisk,onToggleRisk}){
       </div>
       <div style={{height:130,marginTop:14,position:"relative"}}>
         <MountainSVG name={munro.name} w={500} h={130} accent={wx?acc+"cc":"rgba(255,255,255,0.55)"}/>
-        <FogOverlay/>
       </div>
     </div>
   );
@@ -1383,7 +1351,7 @@ export default function App(){
               {bagCount>0&&<div style={{fontSize:10,fontWeight:700,color:"#22c55e",letterSpacing:1}}>{bagCount}/282 BAGGED</div>}
             </div>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-              <h1 style={{fontSize:26,fontWeight:900,margin:0,letterSpacing:2,fontFamily:FFS,textTransform:"uppercase"}}>Jim's Summit Forecast</h1>
+              <h1 style={{fontSize:26,fontWeight:900,margin:0,letterSpacing:2,fontFamily:FFS,textTransform:"uppercase"}}>McMunro Forecast</h1>
             </div>
           </div>
 
@@ -1424,6 +1392,7 @@ export default function App(){
                 ))}
               </div>
             </div>
+            {view==="list"&&<>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
               <div style={{display:"flex",gap:0}}>
                 {[["alpha","A–Z"],["risk","RISK"],["region","REGION"]].map(([k,l],i,arr)=>(
@@ -1434,11 +1403,12 @@ export default function App(){
             <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,scrollbarWidth:"none"}}>
               {regions.map(r=><button key={r} onClick={()=>setRegionFilter(r)} style={{flexShrink:0,background:regionFilter===r?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.04)",border:`1px solid ${regionFilter===r?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.09)"}`,borderRadius:8,padding:"5px 12px",color:regionFilter===r?"#fff":"rgba(255,255,255,0.5)",fontSize:10,cursor:"pointer",whiteSpace:"nowrap",fontWeight:regionFilter===r?700:400}}>{r}</button>)}
             </div>
+            </>}
           </div>
 
-          <div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+          {view==="list"&&<div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
             {RISK_LABELS.map((l,i)=><div key={l} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:RISK_ACCENT[i]}}/><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>{l}</span></div>)}
-          </div>
+          </div>}
 
           {view==="map"?<ScotlandMap munros={MUNROS} bagged={bagged} onSelect={m=>open(m,"home")} regionFilter={regionFilter}/>:null}
 
