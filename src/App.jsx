@@ -325,7 +325,7 @@ function WeatherIcon({code, size=24, hour}){
     code===82 ? "heavyrain" : (code>=85&&code<=86) ? "snow" :
     (code>=95) ? "thunder" : "cloud";
   return(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{display:"block"}}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{display:"block",filter:"drop-shadow(0 0 3px rgba(255,255,255,0.3)) drop-shadow(0 0 6px rgba(255,255,255,0.1))"}}>
       {(c==="sun")&&<>
         <circle cx="12" cy="12" r="4.5" fill="#fbbf24" opacity="0.9"/><circle cx="12" cy="12" r="3" fill="#fcd34d"/>
         {[0,45,90,135,180,225,270,315].map(a=>{const rad=a*Math.PI/180;return <line key={a} x1={12+Math.cos(rad)*6.5} y1={12+Math.sin(rad)*6.5} x2={12+Math.cos(rad)*8.5} y2={12+Math.sin(rad)*8.5} stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round" opacity="0.7"/>})}
@@ -518,12 +518,14 @@ function calcMidge(wx,height){
   if(month<3||month>9)return{level:1,label:"1 — Very Low",desc:"Outside midge season (Nov–Mar)",color:"#555",score:0};
   if(!wx)return{level:1,label:"1 — Very Low",desc:"No weather data",color:"#555",score:0};
   const temp=wx.temperature_2m??10,wind=wx.wind_speed_10m??0,hum=wx.relative_humidity_2m??60;
-  const altF=height>900?0.05:height>700?0.15:height>500?0.4:height>300?0.7:1.0;
+  const hr=new Date().getHours();
+  // Time of day: dawn (5-9) and dusk (18-22) are peak midge hours
+  const todF=hr>=5&&hr<=8?1.0:hr>=18&&hr<=22?0.9:hr>=9&&hr<=11?0.5:hr>=16&&hr<=17?0.6:hr>=12&&hr<=15?0.2:0.05;
   const windF=wind>12?0:wind>8?0.05:wind>6?0.15:wind>4?0.4:wind>2?0.7:1.0;
   const tempF=(temp>=12&&temp<=18)?1.0:(temp>=9&&temp<=22)?0.6:(temp>=5&&temp<=25)?0.25:0.0;
   const humF=hum>85?1.0:hum>75?0.8:hum>65?0.5:hum>50?0.2:0.05;
   const seasonF=[0,0,0,0.15,0.4,0.7,0.95,1.0,0.6,0.2,0,0][month]??0;
-  const raw=(windF*0.35+tempF*0.2+humF*0.2+seasonF*0.25)*altF;
+  const raw=windF*0.30+tempF*0.20+humF*0.20+seasonF*0.15+todF*0.15;
   const level=raw>0.65?5:raw>0.45?4:raw>0.25?3:raw>0.08?2:1;
   const labels=["","1 — Very Low","2 — Low","3 — Moderate","4 — High","5 — Severe"];
   const colors=["","#22c55e","#84cc16","#eab308","#f97316","#dc2626"];
@@ -634,14 +636,21 @@ function TempDisplay({celsius,big=false,style={}}){
 
 // ─── Wind compass ──────────────────────────────────────────────────────────────
 function WindCompass({dir}){
-  const rad=(dir*Math.PI)/180,cx=20,cy=20;
-  const ax=cx+Math.sin(rad)*10,ay=cy-Math.cos(rad)*10;
-  const bx=cx-Math.sin(rad)*5,by=cy+Math.cos(rad)*5;
+  // dir = direction wind comes FROM. Arrow should point where wind GOES (dir+180)
+  const blowDir=(dir+180)%360;
+  const rad=(blowDir*Math.PI)/180,cx=20,cy=20;
+  const tipX=cx+Math.sin(rad)*12,tipY=cy-Math.cos(rad)*12;
+  const tailX=cx-Math.sin(rad)*8,tailY=cy+Math.cos(rad)*8;
+  // Arrow head
+  const headL=4,headA=25*Math.PI/180;
+  const hx1=tipX-Math.sin(rad-headA)*headL,hy1=tipY+Math.cos(rad-headA)*headL;
+  const hx2=tipX-Math.sin(rad+headA)*headL,hy2=tipY+Math.cos(rad+headA)*headL;
   return(<svg width="40" height="40" viewBox="0 0 40 40">
-    <circle cx={cx} cy={cy} r="15" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
-    {["N","E","S","W"].map((d,i)=>{const a=i*Math.PI/2;return <text key={d} x={cx+Math.sin(a)*11} y={cy-Math.cos(a)*11+3.5} fill={d==="N"?"#fff":"rgba(255,255,255,0.3)"} fontSize="5.5" textAnchor="middle" fontWeight={d==="N"?"700":"400"}>{d}</text>;})}
-    <line x1={bx} y1={by} x2={ax} y2={ay} stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
-    <circle cx={ax} cy={ay} r="2.5" fill="#60a5fa"/><circle cx={cx} cy={cy} r="2" fill="rgba(255,255,255,0.2)"/>
+    <circle cx={cx} cy={cy} r="15" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.8"/>
+    {["N","E","S","W"].map((d,i)=>{const a=i*Math.PI/2;return <text key={d} x={cx+Math.sin(a)*11} y={cy-Math.cos(a)*11+3.5} fill={d==="N"?"#fff":"rgba(255,255,255,0.25)"} fontSize="5" textAnchor="middle" fontWeight={d==="N"?"700":"400"}>{d}</text>;})}
+    <line x1={tailX} y1={tailY} x2={tipX} y2={tipY} stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+    <polygon points={`${tipX},${tipY} ${hx1},${hy1} ${hx2},${hy2}`} fill="#60a5fa"/>
+    <circle cx={cx} cy={cy} r="1.5" fill="rgba(255,255,255,0.2)"/>
   </svg>);
 }
 
@@ -695,7 +704,7 @@ function MidgePanel({wx,height}){
     {label:"Wind",desc:wx?(wx.wind_speed_10m>6?"Suppressing midges":"Low wind — midges can fly"):"—",pct:wx?Math.max(0,100-wx.wind_speed_10m*8):50},
     {label:"Temperature",desc:wx?((wx.temperature_2m>=12&&wx.temperature_2m<=18)?"Peak midge range (12–18°C)":"Outside peak range"):"—",pct:wx?((wx.temperature_2m>=12&&wx.temperature_2m<=18)?90:30):50},
     {label:"Humidity",desc:wx?(wx.relative_humidity_2m>70?"High humidity favours midges":"Drier air suppresses midges"):"—",pct:wx?Math.min(100,wx.relative_humidity_2m):50},
-    {label:"Altitude",desc:height>600?"High altitude reduces midges":"Valley-level — more midges likely",pct:Math.max(0,100-height/10)},
+    {label:"Time of day",desc:(()=>{const h=new Date().getHours();return h>=5&&h<=8?"Dawn — peak midge time":h>=18&&h<=22?"Dusk — peak midge time":h>=12&&h<=15?"Midday — least midges":"Moderate midge activity hours";})(),pct:(()=>{const h=new Date().getHours();return h>=5&&h<=8?100:h>=18&&h<=22?90:h>=9&&h<=11?50:h>=16&&h<=17?60:h>=12&&h<=15?20:5;})()},
     {label:"Season",desc:(()=>{const mo=new Date().getMonth();return mo>=6&&mo<=7?"Peak midge season (Jul–Aug)":mo>=3&&mo<=9?"Active midge season (Apr–Oct)":"Dormant — no midges (Nov–Mar)";})(),pct:[0,0,0,15,40,70,95,100,60,20,0,0][new Date().getMonth()]||0},
   ];
   return(
@@ -1193,7 +1202,10 @@ function DetailPage({munro,onBack,bagged,onToggleBag}){
         ):<div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)"}}>No data available</div>}
       </div>
       <div style={{padding:"0 24px"}}>
-        <div style={{height:130,width:"100%",position:"relative"}}><MountainSVG name={munro.name} w={500} h={130} accent={acc+"cc"}/></div>
+        <div style={{height:130,width:"100%",position:"relative"}}>
+          <MountainSVG name={munro.name} w={500} h={130} accent="rgba(255,255,255,0.7)"/>
+          <div style={{position:"absolute",top:4,right:16}}><WeatherIcon code={cur.weather_code??3} size={36}/></div>
+        </div>
       </div>
       {data&&<>
         <div style={{display:"flex",padding:"12px 24px 14px"}}>{[["hourly","HOURLY"],["days","4-DAY OUTLOOK"]].map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"10px 0",background:tab===k?"rgba(255,255,255,0.12)":"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:k==="hourly"?"10px 0 0 10px":"0 10px 10px 0",color:tab===k?"#fff":"rgba(255,255,255,0.35)",fontSize:11,letterSpacing:2,cursor:"pointer",fontWeight:tab===k?700:400,fontFamily:FF}}>{l}</button>)}</div>
@@ -1224,7 +1236,7 @@ function MunroCardWithCallback({munro,onClick,onWeatherLoaded,bagged}){
         <div style={{fontSize:14,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontFamily:FFS,textTransform:"uppercase",letterSpacing:0.5}}>{munro.name}</div>
         <div style={{fontSize:10,color:"rgba(255,255,255,0.55)"}}>{munro.height}m</div>
       </div>
-      <div style={{width:80,height:40,opacity:.5,flexShrink:0,margin:"0 12px"}}><MountainSVG name={munro.name} w={80} h={40} mini accent={acc+"99"}/></div>
+      <div style={{width:80,height:40,opacity:.5,flexShrink:0,margin:"0 12px"}}><MountainSVG name={munro.name} w={80} h={40} mini accent="rgba(255,255,255,0.35)"/></div>
       <div style={{textAlign:"right",flexShrink:0}}>
         {wx?<><div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{dispTemp}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>{secTemp}</div><RiskBar band={risk.band} score={risk.score}/><MidgeBadge wx={wx} height={munro.height}/></>:<SkeletonLoader type="card"/>}
       </div>
@@ -1252,7 +1264,7 @@ function HeroCard({munro,onDetail,showRisk,onToggleRisk}){
             <h2 style={{fontSize:munro.name.length>16?16:22,fontWeight:900,margin:"0 0 2px",letterSpacing:1.5,fontFamily:FFS,textTransform:"uppercase"}}>{munro.name}</h2>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.65)"}}>{munro.height}m · {munro.region}</div>
           </div>
-          <button onClick={onDetail} style={{background:"rgba(255,255,255,0.12)",border:`1px solid ${acc}88`,color:"#fff",borderRadius:10,padding:"9px 16px",cursor:"pointer",fontSize:12,letterSpacing:1,fontWeight:600,flexShrink:0,fontFamily:FF}}>DETAIL →</button>
+          <button onClick={onDetail} style={{background:"rgba(255,255,255,0.12)",border:`1px solid ${acc}88`,color:"#fff",borderRadius:10,padding:"9px 16px",cursor:"pointer",fontSize:12,letterSpacing:1,fontWeight:600,flexShrink:0,fontFamily:FF}}>DETAILS →</button>
         </div>
         {loading?<SkeletonLoader/>:wx?<>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
@@ -1291,7 +1303,8 @@ function HeroCard({munro,onDetail,showRisk,onToggleRisk}){
         </>:null}
       </div>
       <div style={{height:130,marginTop:14,position:"relative"}}>
-        <MountainSVG name={munro.name} w={500} h={130} accent={wx?acc+"cc":"rgba(255,255,255,0.55)"}/>
+        <MountainSVG name={munro.name} w={500} h={130} accent="rgba(255,255,255,0.65)"/>
+        {wx&&<div style={{position:"absolute",top:4,right:16}}><WeatherIcon code={wx.weather_code??3} size={40}/></div>}
       </div>
     </div>
   );
@@ -1351,7 +1364,7 @@ export default function App(){
               {bagCount>0&&<div style={{fontSize:10,fontWeight:700,color:"#22c55e",letterSpacing:1}}>{bagCount}/282 BAGGED</div>}
             </div>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-              <h1 style={{fontSize:26,fontWeight:900,margin:0,letterSpacing:2,fontFamily:FFS,textTransform:"uppercase"}}>McMunro Forecast</h1>
+              <h1 style={{fontSize:26,fontWeight:900,margin:0,letterSpacing:2,fontFamily:FFS,textTransform:"uppercase"}}>Munro Forecast</h1>
             </div>
           </div>
 
@@ -1392,18 +1405,16 @@ export default function App(){
                 ))}
               </div>
             </div>
-            {view==="list"&&<>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            {view==="list"&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
               <div style={{display:"flex",gap:0}}>
                 {[["alpha","A–Z"],["risk","RISK"],["region","REGION"]].map(([k,l],i,arr)=>(
                   <button key={k} onClick={()=>setSortOrder(k)} style={{padding:"6px 12px",background:sortOrder===k?"rgba(255,255,255,0.16)":"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:i===0?"8px 0 0 8px":i===arr.length-1?"0 8px 8px 0":"0",color:sortOrder===k?"#fff":"rgba(255,255,255,0.5)",fontSize:10,letterSpacing:1,cursor:"pointer",fontWeight:sortOrder===k?700:400}}>{l}</button>
                 ))}
               </div>
-            </div>
+            </div>}
             <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,scrollbarWidth:"none"}}>
               {regions.map(r=><button key={r} onClick={()=>setRegionFilter(r)} style={{flexShrink:0,background:regionFilter===r?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.04)",border:`1px solid ${regionFilter===r?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.09)"}`,borderRadius:8,padding:"5px 12px",color:regionFilter===r?"#fff":"rgba(255,255,255,0.5)",fontSize:10,cursor:"pointer",whiteSpace:"nowrap",fontWeight:regionFilter===r?700:400}}>{r}</button>)}
             </div>
-            </>}
           </div>
 
           {view==="list"&&<div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
