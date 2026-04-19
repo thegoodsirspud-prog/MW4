@@ -35,6 +35,20 @@ export default function MunroHero({
   const tempF = Math.round((tempC * 9) / 5 + 32);
   const hour = view.rawHour ?? new Date().getHours();
 
+  // Format an ISO datetime to HH:MM in the user's locale, falling back
+  // gracefully when the data isn't present (e.g. first render before fetch).
+  const fmtTime = (iso) => {
+    if (!iso) return null;
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+      return null;
+    }
+  };
+  const sunriseText = fmtTime(view.sunrise);
+  const sunsetText = fmtTime(view.sunset);
+
   // ─── Celestial body position (sun/moon) ──────────────────────────────
   // Sun is up between 6:00 and 20:00 — we map that window to a horizontal
   // arc across the sky, with the peak at noon. Outside daylight we show
@@ -160,7 +174,7 @@ export default function MunroHero({
         <div className="mhero-top">
           <div className="mhero-eyebrow">
             <span className="mhero-dot" />
-            Live · summit elevation forecast
+            Live forecast
           </div>
           <h1 className="mhero-peak-name">{munro.name}</h1>
           <div className="mhero-peak-meta">
@@ -168,6 +182,32 @@ export default function MunroHero({
             <span className="mhero-peak-sep" aria-hidden="true">·</span>
             <span>{munro.h.toLocaleString()}m</span>
           </div>
+          {(sunriseText || sunsetText) && (
+            <div className="mhero-sun-times" aria-label="Sunrise and sunset times">
+              {sunriseText && (
+                <span className="mhero-sun-item">
+                  <svg className="mhero-sun-ico" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                    <circle cx="7" cy="9" r="2.6" fill="#ffd27a" />
+                    <path d="M7 3 L7 5.5 M2.5 7 L4 7 M10 7 L11.5 7 M4 4.2 L5.1 5.3 M8.9 5.3 L10 4.2" stroke="#ffd27a" strokeWidth="0.9" strokeLinecap="round" fill="none"/>
+                    <path d="M1 11 L13 11" stroke="#ffd27a" strokeWidth="0.9" strokeLinecap="round" opacity="0.7"/>
+                    <path d="M5 2.8 L7 0.8 L9 2.8" stroke="#ffd27a" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                  {sunriseText}
+                </span>
+              )}
+              {sunsetText && (
+                <span className="mhero-sun-item">
+                  <svg className="mhero-sun-ico" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                    <circle cx="7" cy="9" r="2.6" fill="#f0a66e" />
+                    <path d="M7 3 L7 5.5 M2.5 7 L4 7 M10 7 L11.5 7 M4 4.2 L5.1 5.3 M8.9 5.3 L10 4.2" stroke="#f0a66e" strokeWidth="0.9" strokeLinecap="round" fill="none"/>
+                    <path d="M1 11 L13 11" stroke="#f0a66e" strokeWidth="0.9" strokeLinecap="round" opacity="0.7"/>
+                    <path d="M5 0.8 L7 2.8 L9 0.8" stroke="#f0a66e" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                  {sunsetText}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mhero-bottom">

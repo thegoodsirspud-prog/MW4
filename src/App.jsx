@@ -131,21 +131,105 @@ function useWeatherFx(type) {
     const r = (a, b) => Math.random() * (b - a) + a;
     const frag = document.createDocumentFragment();
 
-    const rain = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-rain'; d.style.height = r(14, 30) + 'px'; d.style.left = r(-5, 105) + '%'; const dur = r(.5, 1.1); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(.35, .8); frag.appendChild(d); } };
-    const snow = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-snow'; const s = r(2, 6); d.style.width = s + 'px'; d.style.height = s + 'px'; d.style.left = r(0, 100) + '%'; d.style.setProperty('--drift', r(-40, 40) + 'px'); const dur = r(5, 11); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(.5, 1); d.style.filter = 'blur(' + r(0, 1) + 'px)'; frag.appendChild(d); } };
-    const clouds = (n, o1 = .06, o2 = .16) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-cloud'; d.style.width = r(120, 300) + 'px'; d.style.height = r(50, 90) + 'px'; d.style.top = r(0, 40) + '%'; const dur = r(40, 80); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(o1, o2); frag.appendChild(d); } };
-    const flash = () => { const l = document.createElement('div'); l.className = 'wx-flash'; frag.appendChild(l); };
-    const wind = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-wind'; d.style.width = r(100, 300) + 'px'; d.style.top = r(10, 75) + '%'; const dur = r(2, 5); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(.25, .6); frag.appendChild(d); } };
-    const fog = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-fog-layer'; d.style.top = 20 + i * 20 + '%'; const dur = r(18, 32); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; frag.appendChild(d); } };
-    const sun = () => { const d = document.createElement('div'); d.className = 'wx-sun-glow'; frag.appendChild(d); };
+    // Rain: near layer (wider, faster, closer to camera) and far layer
+    // (thinner, slower, softer). Gives precipitation a sense of depth.
+    const rain = (nearCount, farCount) => {
+      for (let i = 0; i < nearCount; i++) {
+        const d = document.createElement('div');
+        d.className = 'wx-rain wx-near';
+        d.style.height = r(18, 34) + 'px';
+        d.style.left = r(-5, 105) + '%';
+        const dur = r(0.55, 0.95);
+        d.style.animationDuration = dur + 's';
+        d.style.animationDelay = -r(0, dur) + 's';
+        d.style.opacity = r(0.55, 0.85);
+        frag.appendChild(d);
+      }
+      for (let i = 0; i < farCount; i++) {
+        const d = document.createElement('div');
+        d.className = 'wx-rain wx-far';
+        d.style.height = r(10, 20) + 'px';
+        d.style.left = r(-5, 105) + '%';
+        const dur = r(1.1, 1.8);
+        d.style.animationDuration = dur + 's';
+        d.style.animationDelay = -r(0, dur) + 's';
+        d.style.opacity = r(0.3, 0.55);
+        frag.appendChild(d);
+      }
+    };
+
+    // Snow: near (larger, faster, crisper) + far (smaller, slower, blurred).
+    const snow = (nearCount, farCount) => {
+      for (let i = 0; i < nearCount; i++) {
+        const d = document.createElement('div');
+        d.className = 'wx-snow wx-near';
+        const s = r(3.5, 6);
+        d.style.width = s + 'px';
+        d.style.height = s + 'px';
+        d.style.left = r(0, 100) + '%';
+        d.style.setProperty('--drift', r(-40, 40) + 'px');
+        const dur = r(5, 9);
+        d.style.animationDuration = dur + 's';
+        d.style.animationDelay = -r(0, dur) + 's';
+        d.style.opacity = r(0.7, 1);
+        frag.appendChild(d);
+      }
+      for (let i = 0; i < farCount; i++) {
+        const d = document.createElement('div');
+        d.className = 'wx-snow wx-far';
+        const s = r(1.5, 3);
+        d.style.width = s + 'px';
+        d.style.height = s + 'px';
+        d.style.left = r(0, 100) + '%';
+        d.style.setProperty('--drift', r(-30, 30) + 'px');
+        const dur = r(9, 14);
+        d.style.animationDuration = dur + 's';
+        d.style.animationDelay = -r(0, dur) + 's';
+        d.style.opacity = r(0.4, 0.75);
+        frag.appendChild(d);
+      }
+    };
+
+    // Clouds: soft volumetric ellipses at varied depths/speeds. Wider
+    // than tall, drifting very slowly. opacity ranges chosen to read on
+    // the brighter sky palette without feeling murky.
+    const clouds = (n, opMin = 0.25, opMax = 0.6) => {
+      for (let i = 0; i < n; i++) {
+        const d = document.createElement('div');
+        d.className = 'wx-cloud';
+        const w = r(220, 420);
+        d.style.width = w + 'px';
+        d.style.height = w * r(0.28, 0.42) + 'px';  // wide ellipse
+        d.style.top = r(2, 45) + '%';
+        const drift = r(55, 110);
+        const bob = r(6, 11);
+        d.style.animationDuration = `${drift}s, ${bob}s`;
+        d.style.animationDelay = `${-r(0, drift)}s, ${-r(0, bob)}s`;
+        d.style.opacity = r(opMin, opMax);
+        frag.appendChild(d);
+      }
+    };
+
+    // Fog layers — soft drifting bands at different heights
+    const fog = (n) => {
+      for (let i = 0; i < n; i++) {
+        const d = document.createElement('div');
+        d.className = 'wx-fog-layer';
+        d.style.top = 15 + i * 22 + '%';
+        const dur = r(28, 48);
+        d.style.animationDuration = dur + 's';
+        d.style.animationDelay = -r(0, dur) + 's';
+        frag.appendChild(d);
+      }
+    };
 
     switch (type) {
-      case 'rain':   clouds(5, .06, .14); rain(60); break;
-      case 'storm':  clouds(6, .06, .16); rain(80); flash(); wind(5); break;
-      case 'snow':   clouds(3, .03, .08); snow(40); break;
-      case 'clear':  sun(); clouds(2, .04, .1); break;
-      case 'fog':    fog(4); clouds(3, .04, .1); break;
-      default:       clouds(6, .06, .16); break;
+      case 'rain':   clouds(5, 0.2, 0.45); rain(38, 24); break;
+      case 'storm':  clouds(6, 0.22, 0.5); rain(55, 35); break;
+      case 'snow':   clouds(4, 0.18, 0.35); snow(26, 18); break;
+      case 'clear':  clouds(2, 0.12, 0.28); break;
+      case 'fog':    fog(4); clouds(3, 0.15, 0.3); break;
+      default:       clouds(6, 0.25, 0.5); break;
     }
     fx.appendChild(frag);
     return () => { while (fx.firstChild) fx.removeChild(fx.firstChild); };
@@ -166,6 +250,10 @@ function buildCurrentView(wx) {
   // Visibility from hourly (nearest hour)
   const vis = nearestHourlyValue(wx, 'visibility');
 
+  // Sunrise/sunset from today's daily forecast
+  const sunrise = wx?.daily?.sunrise?.[0] || null;
+  const sunset = wx?.daily?.sunset?.[0] || null;
+
   return {
     viewKey: 'current', label: 'Now',
     temp: Math.round(c.temperature_2m),
@@ -182,6 +270,7 @@ function buildCurrentView(wx) {
     risk, riskTitle: riskTitle(risk.band), riskDesc: riskDescription(risk.detail),
     rawTemp: c.temperature_2m, rawWind: c.wind_speed_10m, rawHumidity: c.relative_humidity_2m,
     rawHour: new Date().getHours(),
+    sunrise, sunset,
   };
 }
 
@@ -230,6 +319,8 @@ function buildDailyViews(wx) {
       rawWind: d.wind_speed_10m_max?.[i] || 0,
       rawHumidity: dayHum,
       rawHour: 12,
+      sunrise: d.sunrise?.[i] || null,
+      sunset: d.sunset?.[i] || null,
     });
   }
 
@@ -325,8 +416,8 @@ function RiskHub({ activeView, midge, unitF }) {
       <section
         className="risk-card overall-card glass"
         style={{
-          background: `linear-gradient(135deg, rgba(255,255,255,0.05), ${overall.riskColor}18)`,
-          borderColor: `${overall.riskColor}40`,
+          background: `linear-gradient(135deg, rgba(255,255,255,0.07), ${overall.riskColor}20)`,
+          borderColor: `${overall.riskColor}60`,
         }}
       >
         <div className="overall-head">
@@ -865,7 +956,7 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
               <div className="mhero-top">
                 <div className="mhero-eyebrow">
                   <span className="mhero-dot" />
-                  Loading summit forecast…
+                  Loading forecast…
                 </div>
                 <h1 className="mhero-peak-name">{munro.name}</h1>
                 <div className="mhero-peak-meta">
@@ -1020,9 +1111,57 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           }
         />
 
-        {/* CONDITIONS — always 4 cards + wind (moved under hero for prominence) */}
+        {/* HOURLY — clickable (placed above daily for tap-to-preview-first flow) */}
+        {hourlyViews.length > 0 && (
+          <section className="section">
+            <h2 className="section-title"><span>Hourly · tap to preview</span></h2>
+            <div className="hourly-scroll">
+              {hourlyViews.map((h, i) => {
+                const active = selectedMode === 'hour' && selectedIndex === i;
+                const isCurrent = h.isNow && selectedMode !== 'hour';
+                return (
+                  <button key={h.viewKey}
+                    className={`hourly-cell glass ${active ? 'active' : ''} ${isCurrent ? 'current' : ''}`}
+                    onClick={() => { setSelectedMode('hour'); setSelectedIndex(i); }}>
+                    <div className="hourly-time">{h.label}</div>
+                    <div className="hourly-icon"><WeatherIcon type={h.type} size={20} /></div>
+                    <div className="hourly-temp">{displayTemp(h.temp)}°</div>
+                    <div className="hourly-risk-dot" style={{ background: h.risk.riskColor, boxShadow: `0 0 6px ${h.risk.riskColor}` }} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* DAILY STRIP — wrapped as a proper section with matching heading */}
         <section className="section">
-          <div className="section-title"><span>Conditions</span></div>
+          <h2 className="section-title"><span>Daily · tap to preview</span></h2>
+          <nav className="forecast-strip glass" aria-label="7-day forecast">
+            {dailyViews.slice(0, 7).map((day, i) => {
+              const active = (selectedMode === 'day' && selectedIndex === i) ||
+                             (selectedMode === 'current' && i === 0);
+              return (
+                <button key={day.viewKey}
+                  className={`strip-cell ${active ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedMode(i === 0 ? 'current' : 'day');
+                    setSelectedIndex(i);
+                  }}
+                  aria-pressed={active}>
+                  <div className="strip-risk-dot" style={{ background: day.risk.riskColor, boxShadow: `0 0 6px ${day.risk.riskColor}` }} />
+                  <div className="strip-day">{day.label}</div>
+                  <div className="strip-icon"><WeatherIcon type={day.type} size={22} /></div>
+                  <div className="strip-temp">{displayTemp(day.temp)}°</div>
+                </button>
+              );
+            })}
+          </nav>
+        </section>
+
+        {/* CONDITIONS — wind + 4 metrics */}
+        <section className="section">
+          <h2 className="section-title"><span>Conditions</span></h2>
           <div className="metrics">
             <div className="metric glass wind-widget">
               <div className="compass">
@@ -1075,51 +1214,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 
         {/* RISK HUB — Overall + Mountain + Midge */}
         <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} />
-
-        {/* HOURLY — clickable (placed above daily for tap-to-preview-first flow) */}
-        {hourlyViews.length > 0 && (
-          <section className="section">
-            <div className="section-title"><span>Hourly · tap to preview</span></div>
-            <div className="hourly-scroll">
-              {hourlyViews.map((h, i) => {
-                const active = selectedMode === 'hour' && selectedIndex === i;
-                const isCurrent = h.isNow && selectedMode !== 'hour';
-                return (
-                  <button key={h.viewKey}
-                    className={`hourly-cell glass ${active ? 'active' : ''} ${isCurrent ? 'current' : ''}`}
-                    onClick={() => { setSelectedMode('hour'); setSelectedIndex(i); }}>
-                    <div className="hourly-time">{h.label}</div>
-                    <div className="hourly-icon"><WeatherIcon type={h.type} size={20} /></div>
-                    <div className="hourly-temp">{displayTemp(h.temp)}°</div>
-                    <div className="hourly-risk-dot" style={{ background: h.risk.riskColor, boxShadow: `0 0 6px ${h.risk.riskColor}` }} />
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* 7-DAY STRIP */}
-        <nav className="forecast-strip glass" aria-label="7-day forecast">
-          {dailyViews.slice(0, 7).map((day, i) => {
-            const active = (selectedMode === 'day' && selectedIndex === i) ||
-                           (selectedMode === 'current' && i === 0);
-            return (
-              <button key={day.viewKey}
-                className={`strip-cell ${active ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedMode(i === 0 ? 'current' : 'day');
-                  setSelectedIndex(i);
-                }}
-                aria-pressed={active}>
-                <div className="strip-risk-dot" style={{ background: day.risk.riskColor, boxShadow: `0 0 6px ${day.risk.riskColor}` }} />
-                <div className="strip-day">{day.label}</div>
-                <div className="strip-icon"><WeatherIcon type={day.type} size={22} /></div>
-                <div className="strip-temp">{displayTemp(day.temp)}°</div>
-              </button>
-            );
-          })}
-        </nav>
 
 
         {/* ALERT for elevated risk */}

@@ -80,7 +80,21 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 
-/* ─── 4. Weather FX ───────────────────────────────────────────────────── */
+/* ─── 4. Weather FX ─────────────────────────────────────────────────────
+   Ambient atmospheric layers only — following Apple Weather / BBC Weather
+   restraint. No flashy effects, no visible wind streaks, no competing
+   sun glow (the hero's sun/moon tracker already serves that role).
+
+   Design principles:
+   • Two-layer depth on rain and snow (near + far) so precipitation has
+     parallax. Near = wider, faster, more opaque. Far = thinner, slower,
+     softer.
+   • Clouds rendered as soft radial-gradient ellipses with subtle vertical
+     bob, not blurred circles. They suggest mass rather than blur.
+   • Fog is the softest layer — barely drifting, barely present.
+   • All animations respect prefers-reduced-motion via the JS injector's
+     early return in useWeatherFx. */
+
 .fx {
   position: absolute;
   inset: 0;
@@ -88,84 +102,82 @@ button { font-family: inherit; }
   pointer-events: none;
   z-index: 2;
 }
+
+/* Rain: two depth classes driven by JS */
 .wx-rain {
   position: absolute; width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(180, 200, 230, 0.75));
+  background: linear-gradient(180deg, transparent, rgba(200, 215, 235, 0.7));
   transform: rotate(12deg); transform-origin: top;
   animation: wx-raindrop linear infinite;
   will-change: transform, opacity;
+}
+.wx-rain.wx-near {
+  width: 1.5px;
+  background: linear-gradient(180deg, transparent, rgba(220, 230, 245, 0.85));
+}
+.wx-rain.wx-far {
+  width: 0.5px;
+  background: linear-gradient(180deg, transparent, rgba(180, 195, 215, 0.45));
+  filter: blur(0.4px);
 }
 @keyframes wx-raindrop {
   0%   { transform: translateY(-40px) translateX(0) rotate(12deg); opacity: 0; }
   10%  { opacity: 1; }
   100% { transform: translateY(110vh) translateX(-60px) rotate(12deg); opacity: 0; }
 }
+
+/* Snow: two depth classes */
 .wx-snow {
   position: absolute; border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   animation: wx-snowfall linear infinite;
   will-change: transform, opacity;
 }
+.wx-snow.wx-far {
+  background: rgba(255, 255, 255, 0.6);
+  filter: blur(0.6px);
+}
 @keyframes wx-snowfall {
   0%   { transform: translateY(-30px) translateX(0) rotate(0); opacity: 0; }
   10%, 90% { opacity: 0.9; }
   100% { transform: translateY(110vh) translateX(var(--drift, 40px)) rotate(360deg); opacity: 0; }
 }
+
+/* Soft volumetric clouds — radial-gradient ellipses rather than blurred circles */
 .wx-cloud {
   position: absolute;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 50%; filter: blur(14px);
-  animation: wx-cloud-drift linear infinite;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.24) 0%,
+    rgba(255, 255, 255, 0.12) 40%,
+    rgba(255, 255, 255, 0.04) 70%,
+    transparent 100%
+  );
+  filter: blur(6px);
+  animation: wx-cloud-drift linear infinite, wx-cloud-bob ease-in-out infinite;
   will-change: transform;
 }
 @keyframes wx-cloud-drift {
-  0%   { transform: translateX(-200px); }
-  100% { transform: translateX(calc(100vw + 200px)); }
+  0%   { transform: translateX(-300px); }
+  100% { transform: translateX(calc(100vw + 300px)); }
 }
-.wx-flash {
-  position: absolute; inset: 0;
-  background: rgba(200, 220, 255, 0);
-  animation: wx-lightning 8s infinite;
-  pointer-events: none;
+@keyframes wx-cloud-bob {
+  0%, 100% { margin-top: 0; }
+  50%      { margin-top: 10px; }
 }
-@keyframes wx-lightning {
-  0%, 91%, 100% { background: rgba(200, 220, 255, 0); }
-  92% { background: rgba(200, 220, 255, 0.4); }
-  93% { background: rgba(200, 220, 255, 0); }
-  94% { background: rgba(200, 220, 255, 0.55); }
-  95% { background: rgba(200, 220, 255, 0); }
-}
-.wx-wind {
-  position: absolute; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-  animation: wx-wind-sweep linear infinite;
-  will-change: transform;
-}
-@keyframes wx-wind-sweep {
-  0%   { transform: translateX(-250px); }
-  100% { transform: translateX(calc(100vw + 100px)); }
-}
+
+/* Fog — slow, soft horizontal drift */
 .wx-fog-layer {
-  position: absolute; width: 140%; height: 100px;
-  background: radial-gradient(ellipse, rgba(200, 210, 225, 0.2), transparent 70%);
+  position: absolute; width: 140%; height: 120px;
+  background: radial-gradient(ellipse, rgba(220, 228, 240, 0.22), transparent 70%);
   animation: wx-fog-drift linear infinite;
   will-change: transform;
+  filter: blur(2px);
 }
 @keyframes wx-fog-drift {
-  0%   { transform: translateX(-40%); }
-  100% { transform: translateX(40%); }
-}
-.wx-sun-glow {
-  position: absolute;
-  top: 8%; right: 10%;
-  width: 140px; height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 220, 150, 0.35), rgba(255, 220, 150, 0.08) 40%, transparent 65%);
-  animation: wx-sun-pulse 8s ease-in-out infinite;
-}
-@keyframes wx-sun-pulse {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.08); }
+  0%   { transform: translateX(-30%); }
+  100% { transform: translateX(30%); }
 }
 
 /* ─── 5. Mountain silhouette ──────────────────────────────────────────── */
@@ -179,8 +191,8 @@ button { font-family: inherit; }
 
 /* ─── 6. Glass surface ────────────────────────────────────────────────── */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 16px;
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
@@ -700,12 +712,13 @@ button { font-family: inherit; }
 .section { margin-top: 26px; }
 .section-title {
   display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 1.8px;
-  color: rgba(245, 245, 247, 0.55);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin: 0 0 12px;
   padding-left: 2px;
 }
 
@@ -734,13 +747,13 @@ button { font-family: inherit; }
   position: relative;
 }
 .hourly-cell:hover {
-  background: rgba(255, 255, 255, 0.09) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.11) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
 }
 .hourly-cell:active { transform: scale(0.95); }
 .hourly-cell.current {
-  background: rgba(255, 255, 255, 0.14) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 .hourly-cell.active {
   background: rgba(96, 165, 250, 0.22) !important;

@@ -45,6 +45,8 @@ const DAILY_FIELDS = [
   'wind_gusts_10m_max',
   'wind_direction_10m_dominant',
   'precipitation_probability_max',
+  'sunrise',
+  'sunset',
 ].join(',');
 
 // In-memory cache, keyed by peak name — weather is stable enough to cache
