@@ -49,6 +49,17 @@ export default function MunroHero({
   const sunriseText = fmtTime(view.sunrise);
   const sunsetText = fmtTime(view.sunset);
 
+  // When the user taps a specific hour or day, viewKey is not 'current'.
+  // The eyebrow reflects this — live green dot becomes amber "previewing".
+  const isPreview = view.viewKey !== 'current';
+
+  // Convert "MODERATE" to "Moderate" — Ascent and Midge values should
+  // read with identical case so the ring pair looks like a set, not a
+  // typographic mismatch. RISK_LABELS stays uppercase at the source
+  // because other parts of the app (outlook badges) want it that way.
+  const toTitleCase = (s) =>
+    s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+
   // ─── Celestial body position (sun/moon) ──────────────────────────────
   // Sun is up between 6:00 and 20:00 — we map that window to a horizontal
   // arc across the sky, with the peak at noon. Outside daylight we show
@@ -172,9 +183,9 @@ export default function MunroHero({
       {/* ── Foreground content ── */}
       <div className="mhero-content">
         <div className="mhero-top">
-          <div className="mhero-eyebrow">
+          <div className={`mhero-eyebrow ${isPreview ? 'mhero-eyebrow-preview' : ''}`}>
             <span className="mhero-dot" />
-            Live forecast
+            {isPreview ? `Previewing · ${view.label}` : 'Live forecast'}
           </div>
           <h1 className="mhero-peak-name">{munro.name}</h1>
           <div className="mhero-peak-meta">
@@ -257,7 +268,7 @@ export default function MunroHero({
         <div className="mhero-rings">
           <Ring
             label="Ascent"
-            value={RISK_LABELS[view.risk.band]}
+            value={toTitleCase(RISK_LABELS[view.risk.band])}
             percent={(view.risk.band + 1) * 20}
             color={view.risk.riskColor}
           />
@@ -291,26 +302,28 @@ function Ring({ label, value, percent, color }) {
   return (
     <div className="mhero-ring">
       <svg className="mhero-ring-svg" viewBox="0 0 40 40" aria-hidden="true">
-        {/* Track */}
+        {/* Track — darker than before so the ring has presence on the bright
+            sky. Sits behind the coloured arc. */}
         <circle
           cx="20" cy="20" r={r}
           fill="none"
-          stroke="rgba(255, 255, 255, 0.18)"
-          strokeWidth="3"
+          stroke="rgba(15, 25, 40, 0.45)"
+          strokeWidth="3.5"
         />
         {/* Progress arc — starts at 12 o'clock, clockwise */}
         <circle
           cx="20" cy="20" r={r}
           fill="none"
           stroke={color}
-          strokeWidth="3"
+          strokeWidth="3.5"
           strokeDasharray={`${dash} ${c}`}
           strokeLinecap="round"
           transform="rotate(-90 20 20)"
           style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(.16,1,.3,1)' }}
         />
-        {/* Inner dot echoing the color */}
-        <circle cx="20" cy="20" r="3" fill={color} />
+        {/* Inner dot — always crisp white regardless of ring colour, so it
+            reads on any sky. Arc and track carry the colour, not the dot. */}
+        <circle cx="20" cy="20" r="3" fill="#ffffff" />
       </svg>
       <div className="mhero-ring-text">
         <div className="mhero-ring-label">{label}</div>

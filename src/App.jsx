@@ -416,8 +416,8 @@ function RiskHub({ activeView, midge, unitF }) {
       <section
         className="risk-card overall-card glass"
         style={{
-          background: `linear-gradient(135deg, rgba(255,255,255,0.07), ${overall.riskColor}20)`,
-          borderColor: `${overall.riskColor}60`,
+          background: `linear-gradient(135deg, rgba(15, 25, 40, 0.32), ${overall.riskColor}28)`,
+          borderColor: `${overall.riskColor}70`,
         }}
       >
         <div className="overall-head">
