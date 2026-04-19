@@ -1,71 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { MUNROS } from './munros.js';
 
 /**
  * MunroWindMap
  *
  * Real-map wind visualisation. Same CARTO dark-matter vector basemap as
  * MunroTileMap so Scotland's coastlines/terrain are identical between
- * the two views, but instead of 282 peak dots this renders wind arrows
- * at 20 geographically-distributed iconic peaks.
+ * the two views. Renders a wind arrow at EVERY one of Scotland's 282
+ * Munros — a complete national wind picture.
  *
- * Why 20 peaks rather than 282 or a regular grid:
- * • 282 would be visually chaotic AND would require 282 API calls
- * • A regular grid is physically more accurate but abstract — arrows
- *   at named places (Nevis, Cairn Gorm, Lochnagar, Sgurr Alasdair...)
- *   give the wind a story
- * • 20 is the sweet spot: every major massif is represented, each arrow
- *   is legible, and 20 parallel fetches complete in under a second
+ * Why all 282 (vs a sampling): a sample of 20 peaks looks tidy but
+ * loses the ability to see actual weather PATTERNS — pressure systems
+ * sweeping in from the Atlantic show up clearly only when you can see
+ * the gradient across Skye → Knoydart → Lochaber. With all 282 you
+ * literally see weather moving across Scotland in real time.
  *
- * Arrow rendering approach:
- * • Each peak is a Point feature carrying its wind speed + direction
- * • An HTML overlay is used for each arrow so we can animate rotation
- *   via CSS transform (MapLibre's symbol rotation is static per-render)
- * • On pan/zoom, the overlays reposition via map.project()
+ * Performance: 282 parallel fetches against Open-Meteo's free tier is
+ * acceptable but rough. We batch in waves of 30 with a small delay so
+ * the API isn't hammered, and we render arrows progressively as data
+ * arrives — not waiting for all 282 to finish before showing anything.
  */
-
-// 20 iconic peaks chosen for geographic spread across every major region.
-// These are the peaks every mountaineer recognises AND together they
-// cover the country from Skye in the west to the Cairngorms in the east,
-// Sutherland in the north to Ben Lomond in the south.
-const WIND_PEAKS = [
-  // Far north
-  { name: 'Ben Hope',           lat: 58.4157, lon: -4.6194, h: 927 },
-  { name: 'Ben More Assynt',    lat: 58.1334, lon: -4.8577, h: 998 },
-  // Torridon / Applecross
-  { name: 'Liathach',           lat: 57.5510, lon: -5.4803, h: 1055 },
-  { name: 'An Teallach',        lat: 57.8110, lon: -5.2700, h: 1062 },
-  // Kintail / Affric
-  { name: 'Carn Eighe',         lat: 57.2875, lon: -5.1155, h: 1183 },
-  { name: 'The Saddle',         lat: 57.1666, lon: -5.4306, h: 1010 },
-  // Skye Cuillin
-  { name: 'Sgurr Alasdair',     lat: 57.2067, lon: -6.2261, h: 992 },
-  // Knoydart
-  { name: 'Ladhar Bheinn',      lat: 57.0653, lon: -5.6833, h: 1020 },
-  // Lochaber / Nevis
-  { name: 'Ben Nevis',          lat: 56.7967, lon: -5.0042, h: 1345 },
-  { name: 'Aonach Beag',        lat: 56.8006, lon: -4.9537, h: 1234 },
-  // Glen Coe
-  { name: 'Bidean nam Bian',    lat: 56.6432, lon: -5.0295, h: 1150 },
-  { name: 'Buachaille Etive Mor', lat: 56.6400, lon: -4.8958, h: 1022 },
-  // Cairngorms
-  { name: 'Ben Macdui',         lat: 57.0706, lon: -3.6700, h: 1309 },
-  { name: 'Cairn Gorm',         lat: 57.1167, lon: -3.6440, h: 1245 },
-  { name: 'Lochnagar',          lat: 56.9605, lon: -3.2457, h: 1155 },
-  // Breadalbane / Central
-  { name: 'Ben Lawers',         lat: 56.5452, lon: -4.2211, h: 1214 },
-  { name: 'Schiehallion',       lat: 56.6685, lon: -4.0986, h: 1083 },
-  // South
-  { name: 'Ben More',           lat: 56.3863, lon: -4.5407, h: 1174 },
-  { name: 'Ben Lomond',         lat: 56.1903, lon: -4.6328, h: 974 },
-  // Mull
-  { name: 'Ben More (Mull)',    lat: 56.4203, lon: -6.0144, h: 966 },
-];
 
 // Wind speed → colour. Five bands matching the mountain-risk palette so
 // users immediately transfer meaning: green = safe, red = dangerous.
-// Calibrated for mountain summits where 40+ mph is genuinely inadvisable.
 function windColor(mph) {
   if (mph < 10) return '#22c55e';
   if (mph < 20) return '#84cc16';
@@ -82,39 +41,61 @@ function windLabel(mph) {
   return 'Dangerous';
 }
 
+const BATCH_SIZE = 30;
+const BATCH_DELAY_MS = 120;
+
 export default function MunroWindMap({ onClose }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
-  const [windData, setWindData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [windData, setWindData] = useState([]);  // grows progressively
+  const [loaded, setLoaded] = useState(0);
   const [hovered, setHovered] = useState(null);
 
-  // Fetch current wind for every peak in parallel
+  const total = MUNROS.length;
+  const loading = loaded < total;
+
+  // Batched fetch: 30 peaks per wave, 120ms between waves. Renders arrows
+  // progressively as each wave completes — user sees the map populate
+  // gradually rather than waiting for all 282 to finish.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const collected = [];
 
-    Promise.all(WIND_PEAKS.map(async (pt) => {
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lon}&elevation=${pt.h}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`;
-        const res = await fetch(url);
-        const data = await res.json();
-        return {
-          ...pt,
-          speed: data.current?.wind_speed_10m ?? 0,
-          gust: data.current?.wind_gusts_10m ?? 0,
-          dir: data.current?.wind_direction_10m ?? 0,
-        };
-      } catch {
-        return { ...pt, speed: 0, gust: 0, dir: 0 };
+    const fetchBatch = async (batch) => {
+      const results = await Promise.all(batch.map(async (pt) => {
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lon}&elevation=${pt.h}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`;
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          const data = await res.json();
+          return {
+            name: pt.name, lat: pt.lat, lon: pt.lon, h: pt.h, region: pt.region,
+            speed: data.current?.wind_speed_10m ?? 0,
+            gust: data.current?.wind_gusts_10m ?? 0,
+            dir: data.current?.wind_direction_10m ?? 0,
+          };
+        } catch {
+          return null;
+        }
+      }));
+      return results.filter(Boolean);
+    };
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    (async () => {
+      for (let i = 0; i < MUNROS.length; i += BATCH_SIZE) {
+        if (cancelled) return;
+        const batch = MUNROS.slice(i, i + BATCH_SIZE);
+        const results = await fetchBatch(batch);
+        if (cancelled) return;
+        collected.push(...results);
+        setWindData([...collected]);
+        setLoaded(Math.min(i + BATCH_SIZE, MUNROS.length));
+        if (i + BATCH_SIZE < MUNROS.length) await sleep(BATCH_DELAY_MS);
       }
-    })).then((results) => {
-      if (!cancelled) {
-        setWindData(results);
-        setLoading(false);
-      }
-    });
+    })();
 
     return () => { cancelled = true; };
   }, []);
@@ -161,7 +142,7 @@ export default function MunroWindMap({ onClose }) {
   }, [ready]);
 
   // Project each wind-peak to screen coordinates for HTML overlay positioning.
-  // Recomputed every render while map is moving; cheap (20 items).
+  // Recomputed every render while map is moving; cheap even at 282 items.
   const projected = (() => {
     if (!ready || !mapRef.current || !windData) return [];
     const map = mapRef.current;
@@ -177,7 +158,9 @@ export default function MunroWindMap({ onClose }) {
         <div className="map-title">
           <div className="map-eyebrow">Live Wind Map</div>
           <div className="map-subtitle">
-            {loading ? 'Sampling 20 summits…' : 'Summit winds · updated live'}
+            {loading
+              ? `Sampling all ${total} summits · ${loaded}/${total}`
+              : `All ${total} summits · live wind`}
           </div>
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
@@ -246,9 +229,9 @@ export default function MunroWindMap({ onClose }) {
         </div>
 
         {loading && (
-          <div className="wind-loading">
-            <div className="wind-loading-spinner" />
-            <div className="wind-loading-text">Sampling 20 summits…</div>
+          <div className="wind-progress-chip" role="status" aria-live="polite">
+            <div className="wind-progress-spinner" />
+            <span className="wind-progress-text">{loaded} / {total}</span>
           </div>
         )}
       </div>

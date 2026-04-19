@@ -1354,6 +1354,58 @@ button { font-family: inherit; }
   letter-spacing: 0.3px;
 }
 
+/* Bottom-right progress chip — non-blocking. Shown while the batched
+   fetch is still completing. Disappears when all 282 are loaded. */
+.wind-progress-chip {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  right: 12px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 9px;
+  background: rgba(15, 25, 40, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 100px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4);
+}
+.wind-progress-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: wind-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.wind-progress-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+}
+
+/* When 282 arrows are on the map at once they need to be smaller so the
+   country isn't a wall of overlapping arrows. Override the per-arrow
+   defaults set above with tighter sizing. */
+.tile-map-viewport .wind-arrow-wrap {
+  /* tighter footprint */
+}
+.tile-map-viewport .wind-arrow svg {
+  width: 16px;
+  height: 22px;
+}
+.tile-map-viewport .wind-arrow-speed {
+  font-size: 9.5px;
+  padding: 0 4px;
+  border-radius: 7px;
+  border-width: 0.5px;
+  margin-top: 0;
+}
+
 /* ── Best Peak Today overlay ─────────────────────────────────────────
    The "advisor" view. Presents top 3 peaks as a ranked card list with
    subtle colour-coded rank badges (gold, silver, bronze) and human
@@ -1672,6 +1724,92 @@ button { font-family: inherit; }
 }
 .tile-map-preview-cancel:active,
 .tile-map-preview-confirm:active { transform: scale(0.96); }
+
+/* Disambiguation list — when a tap hits multiple densely-packed peaks
+   (Cairngorms cluster especially), present them all and let the user pick.
+   Same visual vocabulary as the preview card. */
+.tile-map-disambig {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+  transform: translateX(-50%);
+  z-index: 4;
+  width: min(320px, calc(100% - 32px));
+  padding: 14px 14px 10px;
+  background: rgba(15, 25, 40, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow:
+    0 10px 30px -6px rgba(0, 0, 0, 0.5),
+    0 4px 10px -2px rgba(0, 0, 0, 0.3);
+  animation: tile-map-preview-in 0.25s cubic-bezier(.16, 1, .3, 1);
+}
+.tile-map-disambig-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.tile-map-disambig-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+.tile-map-disambig-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: inherit;
+}
+.tile-map-disambig-close:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.tile-map-disambig-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.tile-map-disambig-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+.tile-map-disambig-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.tile-map-disambig-item:active { background: rgba(96, 165, 250, 0.2); }
+.tile-map-disambig-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+.tile-map-disambig-item-meta {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1px;
+}
 .map-controls {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);

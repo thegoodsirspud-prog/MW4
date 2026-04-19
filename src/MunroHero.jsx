@@ -272,7 +272,7 @@ export default function MunroHero({
             label="Wind"
             value={`${view.wind} mph`}
             percent={Math.min(100, view.wind * 2.5)}
-            color={windRingColor(view.wind)}
+            color="#60a5fa"
             inner={(
               <svg
                 className="mhero-ring-arrow"
@@ -283,7 +283,7 @@ export default function MunroHero({
               >
                 <path
                   d="M6 1.5 L9 7 L6.8 7 L6.8 10.5 L5.2 10.5 L5.2 7 L3 7 Z"
-                  fill={windRingColor(view.wind)}
+                  fill="#60a5fa"
                   stroke="rgba(15, 25, 40, 0.7)"
                   strokeWidth="0.6"
                   strokeLinejoin="round"
@@ -313,18 +313,6 @@ export default function MunroHero({
       </div>
     </header>
   );
-}
-
-/**
- * windRingColor — five-band colour mapping for the wind ring arc, matching
- * the wind map's legend so the visual language is consistent across the app.
- */
-function windRingColor(mph) {
-  if (mph < 10) return '#22c55e';
-  if (mph < 20) return '#84cc16';
-  if (mph < 30) return '#eab308';
-  if (mph < 40) return '#f97316';
-  return '#ef4444';
 }
 
 /**

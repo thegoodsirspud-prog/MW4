@@ -54,6 +54,9 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
   // Tap-preview — first tap on a peak shows this floating card, the user
   // can confirm by tapping "View forecast" or tap elsewhere to dismiss.
   const [preview, setPreview] = useState(null);
+  // Disambiguation list — when a tap hits multiple densely-packed peaks
+  // we show all of them and let the user pick.
+  const [disambig, setDisambig] = useState(null);
 
   // Build GeoJSON once per riskByName change. Each feature carries the
   // peak's name, region, elevation, and risk colour so the GL style can
@@ -164,6 +167,27 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         },
       });
 
+      // INVISIBLE hit-area on top — much bigger than the visible dot so
+      // fat-finger taps still find their target. Receives all click events
+      // before the visible layer.
+      map.addLayer({
+        id: 'munros-hit',
+        type: 'circle',
+        source: 'munros',
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 12,
+            8, 16,
+            11, 20,
+            14, 24,
+          ],
+          'circle-color': 'transparent',
+          'circle-stroke-width': 0,
+          'circle-opacity': 0,  // fully invisible
+        },
+      });
+
       // Label at higher zooms only — peak name floats above the dot when
       // the user zooms in enough to want to read them. At low zoom the
       // dots remain clean.
@@ -192,33 +216,54 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         },
       });
 
-      // Tap a peak → open the preview card. User confirms via the card's
-      // "View forecast" button rather than committing on first tap, which
-      // prevents accidental navigation and lets them verify which peak
-      // they actually hit (Munros are densely packed in the Cairngorms).
-      map.on('click', 'munros-dot', (e) => {
-        const name = e.features?.[0]?.properties?.name;
-        if (!name) return;
-        const munro = MUNROS.find((m) => m.name === name);
-        if (!munro) return;
-        // Gently nudge the peak into view if it's near the edge
-        map.easeTo({
-          center: [munro.lon, munro.lat],
-          duration: 400,
-        });
-        setPreview(munro);
-      });
-
-      // Tap anywhere else on the map — dismiss the preview
+      // Tap a peak (via the invisible larger hit-area layer for fat-finger
+      // tolerance). Query a 22px bbox around the tap to catch dense clusters
+      // — if multiple peaks fall in that bbox, present a disambiguation
+      // list so the user can pick the one they meant. If only one peak,
+      // open the preview directly. The single source of truth is the dense
+      // Cairngorms cluster: at zoom 7-8 you can have 6 Munros within 30px.
       map.on('click', (e) => {
-        const hits = map.queryRenderedFeatures(e.point, { layers: ['munros-dot'] });
-        if (hits.length === 0) setPreview(null);
+        const tol = 22;
+        const bbox = [
+          [e.point.x - tol, e.point.y - tol],
+          [e.point.x + tol, e.point.y + tol],
+        ];
+        const hits = map.queryRenderedFeatures(bbox, { layers: ['munros-hit'] });
+
+        if (hits.length === 0) {
+          // tap on empty water/land — dismiss any open preview/disambig
+          setPreview(null);
+          setDisambig(null);
+          return;
+        }
+
+        // De-duplicate by peak name (the bbox can repeat features)
+        const seen = new Set();
+        const peaks = [];
+        for (const f of hits) {
+          const name = f.properties?.name;
+          if (!name || seen.has(name)) continue;
+          seen.add(name);
+          const m = MUNROS.find((x) => x.name === name);
+          if (m) peaks.push(m);
+          if (peaks.length >= 6) break;  // never more than 6 in disambig
+        }
+
+        if (peaks.length === 1) {
+          map.easeTo({ center: [peaks[0].lon, peaks[0].lat], duration: 400 });
+          setDisambig(null);
+          setPreview(peaks[0]);
+        } else {
+          // Multiple peaks within tolerance — show picker
+          setPreview(null);
+          setDisambig(peaks);
+        }
       });
 
-      map.on('mouseenter', 'munros-dot', () => {
+      map.on('mouseenter', 'munros-hit', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
-      map.on('mouseleave', 'munros-dot', () => {
+      map.on('mouseleave', 'munros-hit', () => {
         map.getCanvas().style.cursor = '';
       });
 
@@ -316,6 +361,41 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
                 className="tile-map-preview-confirm"
                 onClick={() => { const p = preview; setPreview(null); onSelectMunro(p); }}
               >View forecast →</button>
+            </div>
+          </div>
+        )}
+
+        {disambig && (
+          <div className="tile-map-disambig" role="dialog" aria-label="Multiple peaks at this location">
+            <div className="tile-map-disambig-head">
+              <div className="tile-map-disambig-eyebrow">
+                {disambig.length} peaks here
+              </div>
+              <button
+                className="tile-map-disambig-close"
+                onClick={() => setDisambig(null)}
+                aria-label="Dismiss"
+              >✕</button>
+            </div>
+            <div className="tile-map-disambig-list">
+              {disambig
+                .sort((a, b) => b.h - a.h)
+                .map((m) => (
+                <button
+                  key={m.name}
+                  className="tile-map-disambig-item"
+                  onClick={() => {
+                    mapRef.current?.easeTo({ center: [m.lon, m.lat], duration: 400 });
+                    setDisambig(null);
+                    setPreview(m);
+                  }}
+                >
+                  <div className="tile-map-disambig-item-name">{m.name}</div>
+                  <div className="tile-map-disambig-item-meta">
+                    {m.region} · {m.h.toLocaleString()}m
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}
