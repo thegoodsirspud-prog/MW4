@@ -316,6 +316,53 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
     });
   };
 
+  // User location — toggles a blue pulsing dot at the user's geo position
+  // and flies the map to it. Permission failure is silent (we just show
+  // a small toast). We deliberately don't continuously watch position —
+  // a single fix is enough for "where am I relative to these peaks".
+  const [userPos, setUserPos] = useState(null);
+  const [geoError, setGeoError] = useState(null);
+  const requestLocation = () => {
+    setGeoError(null);
+    if (!navigator.geolocation) {
+      setGeoError('Location not supported');
+      setTimeout(() => setGeoError(null), 3000);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const next = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        setUserPos(next);
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [next.lon, next.lat],
+            zoom: Math.max(9, mapRef.current.getZoom()),
+            duration: 900,
+            essential: true,
+          });
+        }
+      },
+      () => {
+        setGeoError('Location permission denied');
+        setTimeout(() => setGeoError(null), 3000);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  };
+
+  // Render the user-position marker as a MapLibre marker so it follows
+  // pan/zoom natively. Recreated on userPos change.
+  useEffect(() => {
+    if (!ready || !mapRef.current || !userPos) return;
+    const el = document.createElement('div');
+    el.className = 'tile-map-userpos';
+    el.innerHTML = '<span class="tile-map-userpos-dot"></span><span class="tile-map-userpos-pulse"></span>';
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([userPos.lon, userPos.lat])
+      .addTo(mapRef.current);
+    return () => marker.remove();
+  }, [ready, userPos]);
+
   return (
     <div className="map-overlay">
       <div className="map-header">
@@ -342,6 +389,26 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
             <circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
           </svg>
         </button>
+
+        <button
+          className={`tile-map-locate ${userPos ? 'tile-map-locate-active' : ''}`}
+          onClick={requestLocation}
+          aria-label="Show my location"
+          title="My location"
+        >
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <circle cx="10" cy="10" r="3" fill="currentColor" />
+            <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.5" />
+            <line x1="10" y1="1.5" x2="10" y2="4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <line x1="10" y1="16" x2="10" y2="18.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <line x1="1.5" y1="10" x2="4" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <line x1="16" y1="10" x2="18.5" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+
+        {geoError && (
+          <div className="tile-map-toast" role="status">{geoError}</div>
+        )}
 
         {preview && (
           <div className="tile-map-preview" role="dialog" aria-label={`Preview of ${preview.name}`}>

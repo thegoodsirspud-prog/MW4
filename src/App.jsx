@@ -452,76 +452,84 @@ function RiskHub({ activeView, midge, unitF }) {
   const toggle = (id) => setExpandedId(expandedId === id ? null : id);
 
   const overall = calcOverallRisk(activeView.risk, midge);
+  const mountainExpanded = expandedId === 'mountain';
 
   return (
     <div className="risk-hub">
-      {/* OVERALL — always visible, prominent */}
+      {/* MERGED: Ascent Rating + Mountain Safety in one card.
+          The header shows score/bar/bands (the at-a-glance summary).
+          A tap on the header expands to reveal the factor-by-factor
+          breakdown (wind, rain, temperature, etc) — the "why". */}
       <section
-        className="risk-card overall-card glass"
+        className={`risk-card overall-card glass ${mountainExpanded ? 'expanded' : ''}`}
         style={{
           background: `linear-gradient(135deg, rgba(15, 25, 40, 0.32), ${overall.riskColor}28)`,
           borderColor: `${overall.riskColor}70`,
         }}
       >
-        <div className="overall-head">
-          <div className="overall-label">Ascent Rating</div>
-          <div className="overall-score" style={{ color: overall.riskColor }}>{overall.score}<span>/100</span></div>
-        </div>
-        <div className="overall-headline">{overall.headline}</div>
-        <div className="overall-context">
-          {activeView.cond} · {activeView.wind} mph {activeView.windDirLabel} · Feels {unitF ? Math.round((activeView.feels * 9) / 5 + 32) : activeView.feels}°{unitF ? 'F' : 'C'}
-        </div>
-        <div className="overall-bar-track">
-          <div
-            className="overall-bar-fill"
-            style={{
-              width: `${overall.score}%`,
-              background: `linear-gradient(90deg, #22c55e 0%, #84cc16 25%, #f59e0b 50%, #f97316 75%, #dc2626 100%)`,
-            }}
-          />
-          <div className="overall-bar-indicator" style={{ left: `${overall.score}%` }} />
-        </div>
-        <div className="overall-bands">
-          {RISK_LABELS.map((label, i) => (
-            <div key={label} className={`overall-band ${i === overall.band ? 'active' : ''}`} style={{ color: i === overall.band ? RISK_COLORS[i] : undefined }}>
-              {label}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* MOUNTAIN SAFETY */}
-      <ExpandableRiskCard
-        icon={<MountainIcon size={22} color={activeView.risk.riskColor} />}
-        eyebrow="Mountain Safety"
-        title={activeView.riskTitle}
-        desc={activeView.riskDesc}
-        color={activeView.risk.riskColor}
-        gaugeValue={activeView.risk.risk10}
-        gaugeMax={10}
-        expanded={expandedId === 'mountain'}
-        onToggle={() => toggle('mountain')}
-      >
-        <div className="factor-eyebrow">How this is calculated</div>
-        {activeView.risk.detail.map((f) => {
-          const pct = (f.score / f.max) * 100;
-          const barColor = pct > 70 ? '#ef4444' : pct > 40 ? '#f59e0b' : '#3b82f6';
-          return (
-            <div key={f.factor} className="factor-row">
-              <div className="factor-head">
-                <span className="factor-label">{f.factor}</span>
-                <span className="factor-value">
-                  {f.value}
-                  <span className="factor-score" style={{ color: barColor }}>{f.score}/{f.max}</span>
-                </span>
+        <button
+          className="overall-head-button"
+          onClick={() => toggle('mountain')}
+          aria-expanded={mountainExpanded}
+          aria-label={mountainExpanded ? 'Hide details' : 'Show details'}
+        >
+          <div className="overall-head">
+            <div className="overall-label">Mountain Safety · Ascent Rating</div>
+            <div className="overall-score" style={{ color: overall.riskColor }}>{overall.score}<span>/100</span></div>
+          </div>
+          <div className="overall-headline">{overall.headline}</div>
+          <div className="overall-context">
+            {activeView.cond} · {activeView.wind} mph {activeView.windDirLabel} · Feels {unitF ? Math.round((activeView.feels * 9) / 5 + 32) : activeView.feels}°{unitF ? 'F' : 'C'}
+          </div>
+          <div className="overall-bar-track">
+            <div
+              className="overall-bar-fill"
+              style={{
+                width: `${overall.score}%`,
+                background: `linear-gradient(90deg, #22c55e 0%, #84cc16 25%, #f59e0b 50%, #f97316 75%, #dc2626 100%)`,
+              }}
+            />
+            <div className="overall-bar-indicator" style={{ left: `${overall.score}%` }} />
+          </div>
+          <div className="overall-bands">
+            {RISK_LABELS.map((label, i) => (
+              <div key={label} className={`overall-band ${i === overall.band ? 'active' : ''}`} style={{ color: i === overall.band ? RISK_COLORS[i] : undefined }}>
+                {label}
               </div>
-              <div className="factor-bar"><div className="factor-fill" style={{ width: `${pct}%`, background: barColor }} /></div>
-              <div className="factor-explain">{f.explain}</div>
-            </div>
-          );
-        })}
-        <div className="factor-footnote">Model based on MWIS (Mountain Weather Information Service) guidance and Mountaineering Scotland training material.</div>
-      </ExpandableRiskCard>
+            ))}
+          </div>
+          <div className="overall-expand-hint">
+            <span>{mountainExpanded ? 'Hide' : 'Show'} factor breakdown</span>
+            <svg className={`overall-chevron ${mountainExpanded ? 'rotated' : ''}`} viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+              <path d="M3 5 L6 8 L9 5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </button>
+
+        {mountainExpanded && (
+          <div className="overall-body">
+            <div className="factor-eyebrow">How this is calculated</div>
+            {activeView.risk.detail.map((f) => {
+              const pct = (f.score / f.max) * 100;
+              const barColor = pct > 70 ? '#ef4444' : pct > 40 ? '#f59e0b' : '#3b82f6';
+              return (
+                <div key={f.factor} className="factor-row">
+                  <div className="factor-head">
+                    <span className="factor-label">{f.factor}</span>
+                    <span className="factor-value">
+                      {f.value}
+                      <span className="factor-score" style={{ color: barColor }}>{f.score}/{f.max}</span>
+                    </span>
+                  </div>
+                  <div className="factor-bar"><div className="factor-fill" style={{ width: `${pct}%`, background: barColor }} /></div>
+                  <div className="factor-explain">{f.explain}</div>
+                </div>
+              );
+            })}
+            <div className="factor-footnote">Model based on MWIS (Mountain Weather Information Service) guidance and Mountaineering Scotland training material.</div>
+          </div>
+        )}
+      </section>
 
       {/* MIDGE — single unified card */}
       <ExpandableRiskCard

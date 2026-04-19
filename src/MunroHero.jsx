@@ -252,14 +252,6 @@ export default function MunroHero({
                 {useF ? Math.round((view.feels * 9) / 5 + 32) : view.feels}°{useF ? 'F' : 'C'}
               </dd>
             </div>
-            <div className="mhero-stat">
-              <dt>Wind</dt>
-              <dd>
-                <span className="mhero-stat-strong">{view.wind}</span>
-                <span className="mhero-stat-unit"> mph </span>
-                <span className="mhero-stat-dim">{view.windDirLabel}</span>
-              </dd>
-            </div>
           </dl>
         </div>
 
