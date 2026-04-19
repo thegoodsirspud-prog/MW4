@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { RISK_LABELS } from './risk.js';
 
 /**
  * MunroHero
@@ -15,18 +16,20 @@ import { useState, useEffect, useRef, useMemo } from 'react';
  *     look stormy at any hour.
  *   • The °C/°F toggle swaps which unit is primary. Both are always
  *     visible — active one large, inactive one small below.
+ *   • Wind and ascent-safety are shown as compact chips in the hero so
+ *     the user has everything at-a-glance. Detailed breakdowns live below.
  *
  * Props:
- *   view         — active forecast view (temp, feels, cond, type, precip)
+ *   view         — active forecast view (temp, feels, cond, type, precip, wind, windDirLabel, risk)
  *   munro        — selected Munro object (name, region, h)
  *   useF         — boolean, °F preference
  *   onUnitToggle — () => void
- *   onPickPeak   — () => void, opens peak picker
  *   skyType      — sky category: clear | cloudy | rain | snow | storm | fog
+ *   midge        — { label, level, color } for the midge chip
  *   hourBanner   — optional banner render when previewing a non-now hour
  */
 export default function MunroHero({
-  view, munro, useF, onUnitToggle, onPickPeak, skyType, hourBanner,
+  view, munro, useF, onUnitToggle, skyType, midge, hourBanner,
 }) {
   const tempC = view.temp;
   const tempF = Math.round((tempC * 9) / 5 + 32);
@@ -237,16 +240,12 @@ export default function MunroHero({
             <span className="mhero-dot" />
             Live · summit elevation forecast
           </div>
-          <button className="mhero-peak" onClick={onPickPeak} aria-label="Change peak">
-            <span className="mhero-peak-name">{munro.name}</span>
-            <span className="mhero-peak-sep">·</span>
-            <span className="mhero-peak-sub">{munro.region}</span>
-            <span className="mhero-peak-sep">·</span>
-            <span className="mhero-peak-sub">{munro.h.toLocaleString()}m</span>
-            <svg className="mhero-peak-chev" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
-              <path d="M3 5 L6 8 L9 5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          <h1 className="mhero-peak-name">{munro.name}</h1>
+          <div className="mhero-peak-meta">
+            <span>{munro.region}</span>
+            <span className="mhero-peak-sep" aria-hidden="true">·</span>
+            <span>{munro.h.toLocaleString()}m</span>
+          </div>
         </div>
 
         <div className="mhero-bottom">
@@ -268,12 +267,53 @@ export default function MunroHero({
               </span>
             </button>
           </div>
-          <div className="mhero-meta">
-            <div className="mhero-cond">{view.cond}</div>
-            <div className="mhero-feels">
-              Feels {useF ? Math.round((view.feels * 9) / 5 + 32) : view.feels}°{useF ? 'F' : 'C'}
+
+          <dl className="mhero-stats" aria-label="Current summit conditions">
+            <div className="mhero-stat">
+              <dt>Conditions</dt>
+              <dd>{view.cond}</dd>
             </div>
-          </div>
+            <div className="mhero-stat">
+              <dt>Feels like</dt>
+              <dd>
+                {useF ? Math.round((view.feels * 9) / 5 + 32) : view.feels}°{useF ? 'F' : 'C'}
+              </dd>
+            </div>
+            <div className="mhero-stat">
+              <dt>Wind</dt>
+              <dd>
+                <span className="mhero-stat-strong">{view.wind}</span>
+                <span className="mhero-stat-unit"> mph </span>
+                <span className="mhero-stat-dim">{view.windDirLabel}</span>
+              </dd>
+            </div>
+            <div className="mhero-stat mhero-stat-chips">
+              <dt>Ascent</dt>
+              <dd>
+                <span
+                  className="mhero-chip"
+                  style={{
+                    '--chip-color': view.risk.riskColor,
+                  }}
+                >
+                  <span className="mhero-chip-dot" />
+                  {RISK_LABELS[view.risk.band]}
+                </span>
+                {midge && (
+                  <span
+                    className="mhero-chip mhero-chip-midge"
+                    style={{
+                      '--chip-color': midge.color || '#38bdf8',
+                    }}
+                    title="Midge activity forecast"
+                  >
+                    <span className="mhero-chip-dot" />
+                    Midge · {midge.label}
+                  </span>
+                )}
+              </dd>
+            </div>
+          </dl>
         </div>
 
         {hourBanner}

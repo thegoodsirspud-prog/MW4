@@ -27,7 +27,11 @@
  */
 
 export const MIDGE_LABELS = ['', 'Very Low', 'Low', 'Moderate', 'High', 'Severe'];
-export const MIDGE_COLORS = ['', '#06b6d4', '#0891b2', '#a855f7', '#7c3aed', '#5b21b6'];
+// Midge scale in blues: light sky → deep navy.
+// Chosen to stay readable against the hero's dark sky AND to be clearly
+// distinct from the mountain-safety scale (which is green→red).
+// Each step shifts hue and lightness so adjacent levels are distinguishable.
+export const MIDGE_COLORS = ['', '#7dd3fc', '#38bdf8', '#0284c7', '#1e40af', '#1e1b4b'];
 export const MIDGE_DESCRIPTIONS = [
   '',
   'Minimal midge activity expected',

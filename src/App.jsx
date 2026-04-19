@@ -867,6 +867,12 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
                   <span className="mhero-dot" />
                   Loading summit forecast…
                 </div>
+                <h1 className="mhero-peak-name">{munro.name}</h1>
+                <div className="mhero-peak-meta">
+                  <span>{munro.region}</span>
+                  <span className="mhero-peak-sep" aria-hidden="true">·</span>
+                  <span>{munro.h.toLocaleString()}m</span>
+                </div>
               </div>
               <div className="mhero-bottom">
                 <div className="mhero-temp-wrap">
@@ -876,10 +882,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
                       <span className="mhero-temp-unit">°</span>
                     </span>
                   </div>
-                </div>
-                <div className="mhero-meta">
-                  <div className="mhero-cond">{munro.name}</div>
-                  <div className="mhero-feels">{munro.region} · {munro.h.toLocaleString()}m</div>
                 </div>
               </div>
             </div>
@@ -1004,8 +1006,8 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           munro={munro}
           useF={useFahrenheit}
           onUnitToggle={() => setUseFahrenheit(!useFahrenheit)}
-          onPickPeak={() => navTo('peaks')}
           skyType={skyType}
+          midge={midge}
           hourBanner={
             selectedMode === 'hour' ? (
               <div className="mhero-hour-banner">
