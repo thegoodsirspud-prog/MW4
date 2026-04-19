@@ -1,0 +1,1232 @@
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { MUNROS } from './munros.js';
+import { lookupWMO } from './weather-codes.js';
+import { fetchWeather } from './weather-api.js';
+import { calcRisk, riskTitle, riskDescription, calcOverallRisk, RISK_LABELS, RISK_COLORS } from './risk.js';
+import { calcMidge } from './midge.js';
+import {
+  projectLatLon, projectMunro, MAP_BOUNDS,
+} from './map-projection.js';
+import {
+  scotlandOutlinePath, skyePath, mullPath, hebridesPath, orkneyPath,
+  MAP_LABELS, MAJOR_LOCHS,
+} from './scotland-geo.js';
+import MunroHero from './MunroHero.jsx';
+import './App.css';
+import './MunroHero.css';
+
+// ────────────────────────────────────────────────────────────────────────────
+// Constants
+// ────────────────────────────────────────────────────────────────────────────
+const COMPASS_DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const GAUGE_CIRC = 119.4;
+
+// Unique regions for filter chips
+const REGIONS = [...new Set(MUNROS.map(m => m.region))].sort();
+
+// ────────────────────────────────────────────────────────────────────────────
+// Utility helpers
+// ────────────────────────────────────────────────────────────────────────────
+const compassDir = (deg) => COMPASS_DIRS[Math.round(deg / 45) % 8];
+const toFahrenheit = (c) => Math.round((c * 9) / 5 + 32);
+
+const formatHour = (iso) => {
+  const h = new Date(iso).getHours();
+  if (h === 0) return '12am';
+  if (h === 12) return '12pm';
+  return h > 12 ? `${h - 12}pm` : `${h}am`;
+};
+
+const formatDay = (iso) => {
+  const d = new Date(iso), today = new Date();
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  const tmrw = new Date(today); tmrw.setDate(today.getDate() + 1);
+  if (d.toDateString() === tmrw.toDateString()) return 'Tmrw';
+  return d.toLocaleDateString('en-GB', { weekday: 'short' });
+};
+
+const visibilityLabel = (km) =>
+  km == null ? '—' :
+  km < 1 ? 'Whiteout' :
+  km < 4 ? 'Poor · low cloud' :
+  km < 10 ? 'Moderate' :
+  km < 20 ? 'Good' : 'Excellent';
+
+const humidityLabel = (h) =>
+  h > 90 ? 'Very damp · fog likely' :
+  h > 75 ? 'Humid · cloud base low' :
+  h > 60 ? 'Comfortable' : 'Dry';
+
+const pressureLabel = (p) =>
+  p < 990 ? 'Very low · storm' :
+  p < 1000 ? 'Low · unsettled' :
+  p < 1015 ? 'Moderate' :
+  p < 1025 ? 'High · settled' : 'Very high · stable';
+
+const precipLabel = (p) =>
+  p > 80 ? 'Very likely' :
+  p > 60 ? 'Likely' :
+  p > 30 ? 'Possible' : 'Low chance';
+
+// ────────────────────────────────────────────────────────────────────────────
+// WeatherIcon — hand-built SVG per sky type
+// ────────────────────────────────────────────────────────────────────────────
+function WeatherIcon({ type, size = 20 }) {
+  const attrs = {
+    viewBox: '0 0 20 20', width: size, height: size,
+    fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
+    strokeLinecap: 'round', strokeLinejoin: 'round',
+  };
+  if (type === 'clear') return (
+    <svg {...attrs}>
+      <circle cx="10" cy="10" r="3.5" fill="#fbbf24" stroke="#fbbf24" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map(a => {
+        const r = (a * Math.PI) / 180;
+        return <line key={a} x1={10 + Math.cos(r) * 5.5} y1={10 + Math.sin(r) * 5.5} x2={10 + Math.cos(r) * 7.5} y2={10 + Math.sin(r) * 7.5} stroke="#fbbf24" />;
+      })}
+    </svg>
+  );
+  if (type === 'cloudy') return <svg {...attrs}><path d="M5.5 13 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.25)" stroke="rgba(255,255,255,.8)" /></svg>;
+  if (type === 'rain') return <svg {...attrs}><path d="M5.5 10 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.8)" /><line x1="7" y1="13" x2="6" y2="17" stroke="#60a5fa" strokeWidth="1.3" /><line x1="10" y1="13" x2="9" y2="17" stroke="#60a5fa" strokeWidth="1.3" /><line x1="13" y1="13" x2="12" y2="17" stroke="#60a5fa" strokeWidth="1.3" /></svg>;
+  if (type === 'snow') return <svg {...attrs}><path d="M5.5 10 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.8)" /><circle cx="7" cy="15.5" r=".7" fill="#e0f2fe" /><circle cx="10" cy="16.5" r=".7" fill="#e0f2fe" /><circle cx="13" cy="15.5" r=".7" fill="#e0f2fe" /></svg>;
+  if (type === 'storm') return <svg {...attrs}><path d="M5.5 10 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.75)" /><path d="M10 12 L8 16 L10.5 16 L9 19" fill="#fbbf24" stroke="#fbbf24" /></svg>;
+  if (type === 'fog') return <svg {...attrs}><line x1="3" y1="7" x2="17" y2="7" stroke="rgba(255,255,255,.6)" strokeWidth="1.5" /><line x1="4" y1="10" x2="16" y2="10" stroke="rgba(255,255,255,.6)" strokeWidth="1.5" /><line x1="3" y1="13" x2="17" y2="13" stroke="rgba(255,255,255,.6)" strokeWidth="1.5" /></svg>;
+  return null;
+}
+
+function MidgeIcon({ size = 18, color = '#fff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <ellipse cx="12" cy="13" rx="4.5" ry="5.5" fill={color} opacity="0.25" stroke={color} strokeWidth="1.2" />
+      <ellipse cx="12" cy="13" rx="2.8" ry="3.5" fill={color} opacity="0.45" />
+      <circle cx="12" cy="8.5" r="2.2" fill={color} opacity="0.6" stroke={color} strokeWidth="0.8" />
+      <line x1="12" y1="6" x2="10.5" y2="3" stroke={color} strokeWidth="0.9" strokeLinecap="round" />
+      <line x1="12" y1="6" x2="13.5" y2="3" stroke={color} strokeWidth="0.9" strokeLinecap="round" />
+      <line x1="7.5" y1="11" x2="4" y2="8.5" stroke={color} strokeWidth="0.7" strokeLinecap="round" opacity="0.6" />
+      <line x1="16.5" y1="11" x2="20" y2="8.5" stroke={color} strokeWidth="0.7" strokeLinecap="round" opacity="0.6" />
+    </svg>
+  );
+}
+
+function MountainIcon({ size = 18, color = '#fff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M3 19 L9 9 L13 14 L16 10 L21 19 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill={`${color}22`} />
+      <path d="M9 9 L10.5 11 L12 9" stroke={color} strokeWidth="0.8" opacity="0.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Weather FX particle engine
+// ────────────────────────────────────────────────────────────────────────────
+function useWeatherFx(type) {
+  const fxRef = useRef(null);
+  const reduced = useRef(typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => {
+    const fx = fxRef.current;
+    if (!fx || reduced.current) return;
+    while (fx.firstChild) fx.removeChild(fx.firstChild);
+    const r = (a, b) => Math.random() * (b - a) + a;
+    const frag = document.createDocumentFragment();
+
+    const rain = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-rain'; d.style.height = r(14, 30) + 'px'; d.style.left = r(-5, 105) + '%'; const dur = r(.5, 1.1); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(.35, .8); frag.appendChild(d); } };
+    const snow = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-snow'; const s = r(2, 6); d.style.width = s + 'px'; d.style.height = s + 'px'; d.style.left = r(0, 100) + '%'; d.style.setProperty('--drift', r(-40, 40) + 'px'); const dur = r(5, 11); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(.5, 1); d.style.filter = 'blur(' + r(0, 1) + 'px)'; frag.appendChild(d); } };
+    const clouds = (n, o1 = .06, o2 = .16) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-cloud'; d.style.width = r(120, 300) + 'px'; d.style.height = r(50, 90) + 'px'; d.style.top = r(0, 40) + '%'; const dur = r(40, 80); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(o1, o2); frag.appendChild(d); } };
+    const flash = () => { const l = document.createElement('div'); l.className = 'wx-flash'; frag.appendChild(l); };
+    const wind = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-wind'; d.style.width = r(100, 300) + 'px'; d.style.top = r(10, 75) + '%'; const dur = r(2, 5); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; d.style.opacity = r(.25, .6); frag.appendChild(d); } };
+    const fog = (n) => { for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'wx-fog-layer'; d.style.top = 20 + i * 20 + '%'; const dur = r(18, 32); d.style.animationDuration = dur + 's'; d.style.animationDelay = -r(0, dur) + 's'; frag.appendChild(d); } };
+    const sun = () => { const d = document.createElement('div'); d.className = 'wx-sun-glow'; frag.appendChild(d); };
+
+    switch (type) {
+      case 'rain':   clouds(5, .06, .14); rain(60); break;
+      case 'storm':  clouds(6, .06, .16); rain(80); flash(); wind(5); break;
+      case 'snow':   clouds(3, .03, .08); snow(40); break;
+      case 'clear':  sun(); clouds(2, .04, .1); break;
+      case 'fog':    fog(4); clouds(3, .04, .1); break;
+      default:       clouds(6, .06, .16); break;
+    }
+    fx.appendChild(frag);
+    return () => { while (fx.firstChild) fx.removeChild(fx.firstChild); };
+  }, [type]);
+
+  return fxRef;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// View model builders
+// ────────────────────────────────────────────────────────────────────────────
+function buildCurrentView(wx) {
+  if (!wx?.current) return null;
+  const c = wx.current;
+  const wmo = lookupWMO(c.weather_code);
+  const risk = calcRisk(c);
+
+  // Visibility from hourly (nearest hour)
+  const vis = nearestHourlyValue(wx, 'visibility');
+
+  return {
+    viewKey: 'current', label: 'Now',
+    temp: Math.round(c.temperature_2m),
+    feels: Math.round(c.apparent_temperature),
+    cond: wmo.label, type: wmo.type,
+    wind: Math.round(c.wind_speed_10m),
+    gust: Math.round(c.wind_gusts_10m || c.wind_speed_10m * 1.4),
+    windDirLabel: compassDir(c.wind_direction_10m),
+    bearing: c.wind_direction_10m,
+    humidity: c.relative_humidity_2m,
+    pressure: Math.round(c.surface_pressure),
+    precip: c.precipitation_probability || 0,
+    visibility: vis != null ? Math.round((vis / 1000) * 10) / 10 : null,
+    risk, riskTitle: riskTitle(risk.band), riskDesc: riskDescription(risk.detail),
+    rawTemp: c.temperature_2m, rawWind: c.wind_speed_10m, rawHumidity: c.relative_humidity_2m,
+    rawHour: new Date().getHours(),
+  };
+}
+
+function buildDailyViews(wx) {
+  if (!wx?.daily) return [];
+  const d = wx.daily;
+  const days = [];
+
+  for (let i = 0; i < d.time.length; i++) {
+    const wc = d.weather_code[i];
+    const wmo = lookupWMO(wc);
+    const feelsMin = d.apparent_temperature_min?.[i] ?? d.temperature_2m_min[i];
+
+    // Best humidity estimate: average of hourly humidity across that day
+    const dayHum = averageHourlyForDay(wx, d.time[i], 'relative_humidity_2m', 75);
+    // Best pressure estimate: mid-day hourly pressure
+    const dayPress = midDayHourlyForDay(wx, d.time[i], 'surface_pressure', 1013);
+    // Best visibility estimate: mid-day hourly visibility
+    const dayVis = midDayHourlyForDay(wx, d.time[i], 'visibility', 20000);
+
+    const syntheticWx = {
+      wind_speed_10m: d.wind_speed_10m_max?.[i] || 0,
+      apparent_temperature: feelsMin,
+      weather_code: wc,
+      precipitation_probability: d.precipitation_probability_max?.[i] || 0,
+      relative_humidity_2m: dayHum,
+    };
+    const risk = calcRisk(syntheticWx);
+
+    days.push({
+      viewKey: `day-${i}`, date: d.time[i], label: formatDay(d.time[i]),
+      temp: Math.round(d.temperature_2m_max[i]),
+      tempMin: Math.round(d.temperature_2m_min[i]),
+      feels: Math.round(feelsMin),
+      cond: wmo.label, type: wmo.type,
+      wind: Math.round(d.wind_speed_10m_max?.[i] || 0),
+      gust: Math.round(d.wind_gusts_10m_max?.[i] || 0),
+      windDirLabel: compassDir(d.wind_direction_10m_dominant?.[i] || 0),
+      bearing: d.wind_direction_10m_dominant?.[i] || 0,
+      humidity: Math.round(dayHum),
+      pressure: Math.round(dayPress),
+      visibility: dayVis != null ? Math.round((dayVis / 1000) * 10) / 10 : null,
+      precip: d.precipitation_probability_max?.[i] || 0,
+      risk, riskTitle: riskTitle(risk.band), riskDesc: riskDescription(risk.detail),
+      rawTemp: (d.temperature_2m_max[i] + d.temperature_2m_min[i]) / 2,
+      rawWind: d.wind_speed_10m_max?.[i] || 0,
+      rawHumidity: dayHum,
+      rawHour: 12,
+    });
+  }
+
+  return days;
+}
+
+function buildHourlyViews(wx) {
+  if (!wx?.hourly) return [];
+  const h = wx.hourly;
+  const now = new Date();
+  const start = Math.max(0, h.time.findIndex(t => new Date(t) >= now));
+  const hrs = [];
+
+  for (let i = start; i < Math.min(start + 12, h.time.length); i++) {
+    const wmo = lookupWMO(h.weather_code[i]);
+    const syntheticWx = {
+      wind_speed_10m: h.wind_speed_10m[i],
+      apparent_temperature: h.apparent_temperature[i],
+      weather_code: h.weather_code[i],
+      precipitation_probability: h.precipitation_probability[i],
+      relative_humidity_2m: h.relative_humidity_2m[i],
+    };
+    const risk = calcRisk(syntheticWx);
+    const hour = new Date(h.time[i]).getHours();
+
+    hrs.push({
+      viewKey: `hour-${i}`,
+      label: i === start ? 'Now' : formatHour(h.time[i]),
+      hour,
+      temp: Math.round(h.temperature_2m[i]),
+      feels: Math.round(h.apparent_temperature[i]),
+      cond: wmo.label, type: wmo.type,
+      wind: Math.round(h.wind_speed_10m[i]),
+      gust: Math.round(h.wind_gusts_10m[i] || h.wind_speed_10m[i] * 1.4),
+      windDirLabel: compassDir(h.wind_direction_10m[i]),
+      bearing: h.wind_direction_10m[i],
+      humidity: h.relative_humidity_2m[i],
+      pressure: h.surface_pressure?.[i] != null ? Math.round(h.surface_pressure[i]) : null,
+      precip: h.precipitation_probability[i],
+      visibility: h.visibility?.[i] ? Math.round((h.visibility[i] / 1000) * 10) / 10 : null,
+      risk, riskTitle: riskTitle(risk.band), riskDesc: riskDescription(risk.detail),
+      rawTemp: h.temperature_2m[i], rawWind: h.wind_speed_10m[i], rawHumidity: h.relative_humidity_2m[i],
+      rawHour: hour,
+      isNow: i === start,
+    });
+  }
+
+  return hrs;
+}
+
+// Helper: nearest hourly reading
+function nearestHourlyValue(wx, key) {
+  if (!wx?.hourly?.[key]) return null;
+  const idx = Math.max(0, wx.hourly.time.findIndex(t => new Date(t) >= new Date()));
+  return wx.hourly[key][idx];
+}
+
+function averageHourlyForDay(wx, dateIso, key, fallback) {
+  if (!wx?.hourly?.[key]) return fallback;
+  const dateStr = dateIso.slice(0, 10);
+  const values = [];
+  for (let i = 0; i < wx.hourly.time.length; i++) {
+    if (wx.hourly.time[i].startsWith(dateStr) && wx.hourly[key][i] != null) {
+      values.push(wx.hourly[key][i]);
+    }
+  }
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : fallback;
+}
+
+function midDayHourlyForDay(wx, dateIso, key, fallback) {
+  if (!wx?.hourly?.[key]) return fallback;
+  const dateStr = dateIso.slice(0, 10);
+  for (let i = 0; i < wx.hourly.time.length; i++) {
+    if (wx.hourly.time[i].startsWith(dateStr) && new Date(wx.hourly.time[i]).getHours() === 12 && wx.hourly[key][i] != null) {
+      return wx.hourly[key][i];
+    }
+  }
+  return fallback;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Risk Hub Section — Overall + Mountain Safety + Midge, all expandable
+// ════════════════════════════════════════════════════════════════════════════
+function RiskHub({ activeView, midge, unitF }) {
+  const [expandedId, setExpandedId] = useState(null);
+  const toggle = (id) => setExpandedId(expandedId === id ? null : id);
+
+  const overall = calcOverallRisk(activeView.risk, midge);
+
+  return (
+    <div className="risk-hub">
+      {/* OVERALL — always visible, prominent */}
+      <section
+        className="risk-card overall-card glass"
+        style={{
+          background: `linear-gradient(135deg, rgba(255,255,255,0.05), ${overall.riskColor}18)`,
+          borderColor: `${overall.riskColor}40`,
+        }}
+      >
+        <div className="overall-head">
+          <div className="overall-label">Ascent Rating</div>
+          <div className="overall-score" style={{ color: overall.riskColor }}>{overall.score}<span>/100</span></div>
+        </div>
+        <div className="overall-headline">{overall.headline}</div>
+        <div className="overall-bar-track">
+          <div
+            className="overall-bar-fill"
+            style={{
+              width: `${overall.score}%`,
+              background: `linear-gradient(90deg, #22c55e 0%, #84cc16 25%, #f59e0b 50%, #f97316 75%, #dc2626 100%)`,
+            }}
+          />
+          <div className="overall-bar-indicator" style={{ left: `${overall.score}%` }} />
+        </div>
+        <div className="overall-bands">
+          {RISK_LABELS.map((label, i) => (
+            <div key={label} className={`overall-band ${i === overall.band ? 'active' : ''}`} style={{ color: i === overall.band ? RISK_COLORS[i] : undefined }}>
+              {label}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* MOUNTAIN SAFETY */}
+      <ExpandableRiskCard
+        icon={<MountainIcon size={22} color={activeView.risk.riskColor} />}
+        eyebrow="Mountain Safety"
+        title={activeView.riskTitle}
+        desc={activeView.riskDesc}
+        color={activeView.risk.riskColor}
+        gaugeValue={activeView.risk.risk10}
+        gaugeMax={10}
+        expanded={expandedId === 'mountain'}
+        onToggle={() => toggle('mountain')}
+      >
+        <div className="factor-eyebrow">How this is calculated</div>
+        {activeView.risk.detail.map((f) => {
+          const pct = (f.score / f.max) * 100;
+          const barColor = pct > 70 ? '#ef4444' : pct > 40 ? '#f59e0b' : '#3b82f6';
+          return (
+            <div key={f.factor} className="factor-row">
+              <div className="factor-head">
+                <span className="factor-label">{f.factor}</span>
+                <span className="factor-value">
+                  {f.value}
+                  <span className="factor-score" style={{ color: barColor }}>{f.score}/{f.max}</span>
+                </span>
+              </div>
+              <div className="factor-bar"><div className="factor-fill" style={{ width: `${pct}%`, background: barColor }} /></div>
+              <div className="factor-explain">{f.explain}</div>
+            </div>
+          );
+        })}
+        <div className="factor-footnote">Model based on MWIS (Mountain Weather Information Service) guidance and Mountaineering Scotland training material.</div>
+      </ExpandableRiskCard>
+
+      {/* MIDGE — single unified card */}
+      <ExpandableRiskCard
+        icon={<MidgeIcon size={22} color={midge.color} />}
+        eyebrow="Midge Forecast"
+        title={midge.dormant ? 'Dormant season · no activity' : `Level ${midge.level} of 5 · ${midge.label}`}
+        desc={midge.desc}
+        color={midge.color}
+        gaugeValue={midge.level}
+        gaugeMax={5}
+        segments={5}
+        expanded={expandedId === 'midge'}
+        onToggle={() => toggle('midge')}
+      >
+        <div className="midge-segments">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="midge-segment" style={{
+              background: i <= midge.level ? midge.color : 'rgba(255,255,255,0.08)',
+              opacity: i <= midge.level ? 1 : 0.4,
+            }} />
+          ))}
+        </div>
+        {midge.factors.length > 0 ? (
+          <>
+            <div className="factor-eyebrow" style={{ marginTop: 14 }}>How this is calculated</div>
+            {midge.factors.map(f => (
+              <div key={f.label} className="factor-row">
+                <div className="factor-head">
+                  <span className="factor-label">{f.label}</span>
+                  <span className="factor-value">{f.desc}</span>
+                </div>
+                <div className="factor-bar">
+                  <div className="factor-fill" style={{
+                    width: `${f.pct}%`,
+                    background: f.pct > 60 ? midge.color : 'rgba(255,255,255,0.3)',
+                    opacity: 0.85,
+                  }} />
+                </div>
+              </div>
+            ))}
+            <div className="factor-footnote">Model based on APS Biocontrol (Smidge™) research. Wind is by far the strongest suppressor of the Highland midge (Culicoides impunctatus).</div>
+          </>
+        ) : (
+          <div className="midge-dormant">
+            The Highland midge enters dormancy from November through March.
+            Adults return in late April, with peak swarming through July and August.
+            For active-season forecasts, return in spring.
+          </div>
+        )}
+      </ExpandableRiskCard>
+    </div>
+  );
+}
+
+function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gaugeMax, segments, expanded, onToggle, children }) {
+  const offset = GAUGE_CIRC - (gaugeValue / gaugeMax) * GAUGE_CIRC;
+  return (
+    <section
+      className={`risk-card glass ${expanded ? 'expanded' : ''}`}
+      style={{
+        background: `linear-gradient(135deg, rgba(255,255,255,0.04), ${color}15)`,
+        borderColor: `${color}30`,
+      }}
+    >
+      <button className="risk-card-head" onClick={onToggle} aria-expanded={expanded}>
+        <div className="gauge" role="meter" aria-valuemin="0" aria-valuemax={gaugeMax} aria-valuenow={gaugeValue}>
+          <svg viewBox="0 0 46 46" width="46" height="46">
+            <circle cx="23" cy="23" r="19" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+            <circle cx="23" cy="23" r="19" fill="none"
+              stroke={color} strokeWidth="3" strokeLinecap="round"
+              strokeDasharray={GAUGE_CIRC} strokeDashoffset={offset.toFixed(1)}
+              className="gauge-arc" />
+          </svg>
+          <div className="gauge-value">
+            {segments ? icon : gaugeValue}
+          </div>
+        </div>
+        <div className="risk-card-info">
+          <div className="risk-card-eyebrow">{eyebrow}</div>
+          <div className="risk-card-title">{title}</div>
+          <div className="risk-card-desc">{desc}</div>
+        </div>
+        <div className={`risk-card-chevron ${expanded ? 'rotated' : ''}`} aria-hidden="true">
+          <svg viewBox="0 0 12 12" width="14" height="14"><path d="M3 5 L6 8 L9 5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </div>
+      </button>
+      {expanded && <div className="risk-card-body">{children}</div>}
+    </section>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Scotland Map — zoomable, all 282 Munros clickable
+// ════════════════════════════════════════════════════════════════════════════
+function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const svgRef = useRef(null);
+
+  // Wind data state for wind map
+  const [windData, setWindData] = useState(null);
+  const [windLoading, setWindLoading] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'wind') return;
+    let cancelled = false;
+    setWindLoading(true);
+
+    // Sample wind at a 6x8 grid across Scotland for the wind map
+    const gridPoints = [];
+    for (let lat = 56.2; lat <= 58.4; lat += 0.35) {
+      for (let lon = -6.6; lon <= -2.6; lon += 0.6) {
+        gridPoints.push({ lat, lon });
+      }
+    }
+
+    Promise.all(gridPoints.map(async (pt) => {
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return { ...pt, speed: data.current?.wind_speed_10m ?? 0, dir: data.current?.wind_direction_10m ?? 0 };
+      } catch {
+        return { ...pt, speed: 0, dir: 0 };
+      }
+    })).then(results => {
+      if (!cancelled) {
+        setWindData(results);
+        setWindLoading(false);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [mode]);
+
+  const W = 480, H = 640;
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e) => {
+    if (!dragging) return;
+    setPan({
+      x: dragStart.current.panX + (e.clientX - dragStart.current.x),
+      y: dragStart.current.panY + (e.clientY - dragStart.current.y),
+    });
+  };
+  const onPointerUp = (e) => {
+    setDragging(false);
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  const zoomTo = (factor) => {
+    const newZoom = Math.max(0.8, Math.min(4, zoom * factor));
+    setZoom(newZoom);
+  };
+
+  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  // Wind colour for a given speed (mph)
+  const windColour = (mph) => {
+    if (mph < 10) return '#22c55e';
+    if (mph < 20) return '#84cc16';
+    if (mph < 30) return '#eab308';
+    if (mph < 40) return '#f97316';
+    return '#ef4444';
+  };
+
+  return (
+    <div className="map-overlay">
+      <div className="map-header">
+        <div className="map-title">
+          <div className="map-eyebrow">{mode === 'wind' ? 'Live wind map' : 'Scottish Munros'}</div>
+          <div className="map-subtitle">{mode === 'wind' ? 'Real-time wind across Scotland' : `All ${MUNROS.length} peaks · tap to select`}</div>
+        </div>
+        <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
+      </div>
+
+      <div className="map-viewport"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+      >
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" style={{ display: 'block' }}>
+          <defs>
+            <linearGradient id="terrainGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%"  stopColor="#2d3d2e" />
+              <stop offset="50%" stopColor="#3a4a3b" />
+              <stop offset="100%" stopColor="#2a3a2b" />
+            </linearGradient>
+            <radialGradient id="highlandGrad" cx="50%" cy="50%">
+              <stop offset="0%"  stopColor="rgba(120, 100, 60, 0.4)" />
+              <stop offset="100%" stopColor="rgba(80, 80, 50, 0)" />
+            </radialGradient>
+            <filter id="mapBlur" x="-10%" y="-10%" width="120%" height="120%">
+              <feGaussianBlur stdDeviation="1.5" />
+            </filter>
+          </defs>
+
+          {/* Ocean background */}
+          <rect x="0" y="0" width={W} height={H} fill="url(#oceanGrad)" />
+          <defs>
+            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#0f1c2e" />
+              <stop offset="100%" stopColor="#1a2a3a" />
+            </linearGradient>
+          </defs>
+
+          {/* Graticule — very faint lat/lon grid */}
+          <g opacity="0.08" stroke="#88aacc" strokeWidth="0.3" strokeDasharray="2 3">
+            {[56, 57, 58].map(lat => {
+              const y = projectLatLon(lat, -4.5).y * H;
+              return <line key={`lat-${lat}`} x1="0" y1={y} x2={W} y2={y} />;
+            })}
+            {[-6, -5, -4, -3].map(lon => {
+              const x = projectLatLon(57, lon).x * W;
+              return <line key={`lon-${lon}`} x1={x} y1="0" x2={x} y2={H} />;
+            })}
+          </g>
+
+          {/* Zoom/pan group */}
+          <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom}) translate(${(1 - zoom) * W / (2 * zoom) + pan.x * 0}, ${(1 - zoom) * H / (2 * zoom) + pan.y * 0})`}>
+            <g transform={`translate(${(W / 2) * (1 - 1 / zoom) - pan.x / zoom}, ${(H / 2) * (1 - 1 / zoom) - pan.y / zoom})`} />
+          </g>
+
+          {/* Simpler approach: use transform="scale() translate()" directly */}
+          <g style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '50% 50%' }}>
+            {/* Mainland */}
+            <path d={scotlandOutlinePath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.8" />
+            {/* Highland shading */}
+            <ellipse cx={W * 0.45} cy={H * 0.35} rx={W * 0.28} ry={H * 0.22} fill="url(#highlandGrad)" filter="url(#mapBlur)" />
+            <ellipse cx={W * 0.60} cy={H * 0.48} rx={W * 0.18} ry={H * 0.14} fill="url(#highlandGrad)" filter="url(#mapBlur)" opacity="0.7" />
+
+            {/* Islands */}
+            <path d={skyePath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
+            <path d={mullPath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
+            <path d={hebridesPath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
+            <path d={orkneyPath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
+
+            {/* Lochs */}
+            {MAJOR_LOCHS.map(loch => {
+              const p = projectLatLon(loch.lat, loch.lon);
+              return (
+                <ellipse key={loch.name}
+                  cx={p.x * W} cy={p.y * H}
+                  rx={8} ry={3}
+                  fill="#3a5a7a" opacity="0.6"
+                  transform={`rotate(30 ${p.x * W} ${p.y * H})`}
+                />
+              );
+            })}
+
+            {/* Region labels */}
+            {MAP_LABELS.map(lbl => {
+              const p = projectLatLon(lbl.lat, lbl.lon);
+              const sz = { lg: 11, md: 9, sm: 7, xs: 6 }[lbl.size];
+              return (
+                <text key={lbl.label}
+                  x={p.x * W} y={p.y * H}
+                  fontSize={sz / zoom}
+                  fill="rgba(255, 255, 255, 0.35)"
+                  textAnchor="middle"
+                  fontWeight="600"
+                  letterSpacing="1.5"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  {lbl.label}
+                </text>
+              );
+            })}
+
+            {/* Wind map mode: live wind vectors */}
+            {mode === 'wind' && windData && windData.map((pt, i) => {
+              const p = projectLatLon(pt.lat, pt.lon);
+              const colour = windColour(pt.speed);
+              const len = Math.min(20, 6 + pt.speed * 0.4);
+              const rad = ((pt.dir + 180) * Math.PI) / 180;
+              const x1 = p.x * W, y1 = p.y * H;
+              const x2 = x1 + Math.sin(rad) * len;
+              const y2 = y1 - Math.cos(rad) * len;
+              return (
+                <g key={i} opacity="0.85">
+                  <line x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke={colour} strokeWidth={1.5 / zoom} strokeLinecap="round" />
+                  <circle cx={x1} cy={y1} r={2 / zoom} fill={colour} />
+                  <text x={x2 + Math.sin(rad) * 4} y={y2 - Math.cos(rad) * 4}
+                    fontSize={7 / zoom} fill={colour} textAnchor="middle"
+                    style={{ pointerEvents: 'none' }}>
+                    {Math.round(pt.speed)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Munro points */}
+            {mode === 'peaks' && MUNROS.map(m => {
+              const p = projectMunro(m, W, H);
+              const isSelected = selectedMunro && selectedMunro.name === m.name;
+              const r = isSelected ? 6 / zoom : 2.5 / zoom;
+              const strokeW = isSelected ? 1.5 / zoom : 0.5 / zoom;
+              return (
+                <g key={m.name}>
+                  <circle cx={p.x} cy={p.y} r={12 / zoom} fill="transparent"
+                    onClick={() => onSelectMunro(m)}
+                    style={{ cursor: 'pointer' }} />
+                  <circle cx={p.x} cy={p.y} r={r}
+                    fill={isSelected ? '#60a5fa' : '#e4d299'}
+                    stroke={isSelected ? '#fff' : '#8a7a55'}
+                    strokeWidth={strokeW}
+                    style={{ pointerEvents: 'none', transition: 'r 0.2s, fill 0.2s' }} />
+                  {isSelected && (
+                    <text x={p.x} y={p.y - 12 / zoom}
+                      fontSize={11 / zoom} fill="#fff"
+                      textAnchor="middle" fontWeight="600"
+                      style={{ pointerEvents: 'none' }}
+                      filter="url(#textShadow)">
+                      {m.name}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+
+            <defs>
+              <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="black" floodOpacity="0.8" />
+              </filter>
+            </defs>
+          </g>
+        </svg>
+      </div>
+
+      <div className="map-controls">
+        <button onClick={() => zoomTo(1.4)} aria-label="Zoom in">+</button>
+        <button onClick={() => zoomTo(1 / 1.4)} aria-label="Zoom out">−</button>
+        <button onClick={resetView} aria-label="Reset view" className="reset-btn">Reset</button>
+      </div>
+
+      {mode === 'wind' && (
+        <div className="map-legend">
+          <div className="legend-title">Wind speed (mph)</div>
+          <div className="legend-scale">
+            {[
+              { c: '#22c55e', l: '<10' },
+              { c: '#84cc16', l: '10–20' },
+              { c: '#eab308', l: '20–30' },
+              { c: '#f97316', l: '30–40' },
+              { c: '#ef4444', l: '40+' },
+            ].map(s => (
+              <div key={s.l} className="legend-item">
+                <div className="legend-colour" style={{ background: s.c }} />
+                <span>{s.l}</span>
+              </div>
+            ))}
+          </div>
+          {windLoading && <div className="legend-loading">Loading live wind…</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Main App
+// ════════════════════════════════════════════════════════════════════════════
+/*export_default*/ function App() {
+  const sortedMunros = useMemo(() => [...MUNROS].sort((a, b) => b.h - a.h), []);
+  const [munro, setMunro] = useState(sortedMunros[0]);
+  const [wx, setWx] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedMode, setSelectedMode] = useState('current');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [useFahrenheit, setUseFahrenheit] = useState(false);
+
+  // Navigation
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [page, setPage] = useState('home'); // home | peaks | map | wind
+
+  // Search & region filter for home screen
+  const [search, setSearch] = useState('');
+  const [regionFilter, setRegionFilter] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setSelectedMode('current');
+    setSelectedIndex(0);
+    fetchWeather(munro).then(data => {
+      if (!cancelled) { setWx(data); setLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [munro]);
+
+  const currentView = useMemo(() => buildCurrentView(wx), [wx]);
+  const dailyViews = useMemo(() => buildDailyViews(wx), [wx]);
+  const hourlyViews = useMemo(() => buildHourlyViews(wx), [wx]);
+
+  const activeView = useMemo(() => {
+    if (selectedMode === 'hour' && hourlyViews[selectedIndex]) return hourlyViews[selectedIndex];
+    if (selectedMode === 'day' && dailyViews[selectedIndex]) {
+      if (selectedIndex === 0 && currentView) return currentView;
+      return dailyViews[selectedIndex];
+    }
+    return currentView;
+  }, [selectedMode, selectedIndex, currentView, dailyViews, hourlyViews]);
+
+  const midge = useMemo(() => {
+    if (!activeView) return calcMidge(null, new Date().getHours());
+    return calcMidge({
+      temperature_2m: activeView.rawTemp,
+      wind_speed_10m: activeView.rawWind,
+      relative_humidity_2m: activeView.rawHumidity,
+    }, activeView.rawHour);
+  }, [activeView]);
+
+  const skyType = activeView?.type || 'cloudy';
+  const fxRef = useWeatherFx(skyType);
+
+  const filteredMunros = useMemo(() => {
+    let list = sortedMunros;
+    if (regionFilter) list = list.filter(m => m.region === regionFilter);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(m => m.name.toLowerCase().includes(q) || m.region.toLowerCase().includes(q));
+    }
+    return list;
+  }, [sortedMunros, regionFilter, search]);
+
+  const displayTemp = (c) => useFahrenheit ? toFahrenheit(c) : c;
+
+  const navTo = (p) => { setPage(p); setMenuOpen(false); };
+
+  // ────── Map views
+  if (page === 'map') {
+    return <ScotlandMap
+      onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
+      selectedMunro={munro}
+      onClose={() => setPage('home')}
+      mode="peaks"
+    />;
+  }
+  if (page === 'wind') {
+    return <ScotlandMap
+      onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
+      selectedMunro={munro}
+      onClose={() => setPage('home')}
+      mode="wind"
+    />;
+  }
+
+  // ────── Peaks full list view
+  if (page === 'peaks') {
+    return (
+      <PeaksPage
+        munros={sortedMunros}
+        currentMunro={munro}
+        regions={REGIONS}
+        onSelect={(m) => { setMunro(m); setPage('home'); }}
+        onClose={() => setPage('home')}
+      />
+    );
+  }
+
+  // ────── Loading state
+  if (loading || !activeView) {
+    return (
+      <div className="app sky-cloudy">
+        <div className="sky" />
+        <main className="content">
+          <div className="mhero mhero-loading">
+            <div className="mhero-content">
+              <div className="mhero-top">
+                <div className="mhero-eyebrow">
+                  <span className="mhero-dot" />
+                  Loading summit forecast…
+                </div>
+              </div>
+              <div className="mhero-bottom">
+                <div className="mhero-temp-wrap">
+                  <div className="mhero-temp">
+                    <span className="mhero-temp-primary">
+                      <span className="mhero-temp-number">—</span>
+                      <span className="mhero-temp-unit">°</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="mhero-meta">
+                  <div className="mhero-cond">{munro.name}</div>
+                  <div className="mhero-feels">{munro.region} · {munro.h.toLocaleString()}m</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ────── Main home page
+  return (
+    <div className={`app sky-${skyType}`}>
+      <div className="sky" />
+      <div className="fx" ref={fxRef} />
+
+      <div className="mountains" aria-hidden="true">
+        <svg viewBox="0 0 480 180" preserveAspectRatio="none">
+          <path d="M0 180 L0 130 L50 90 L90 110 L140 60 L200 95 L250 70 L310 100 L370 55 L430 85 L480 70 L480 180 Z" fill="rgba(10,13,20,0.55)" />
+          <path d="M0 180 L0 150 L60 120 L120 140 L180 105 L240 130 L300 115 L370 135 L430 120 L480 130 L480 180 Z" fill="rgba(10,13,20,0.85)" />
+        </svg>
+      </div>
+
+      {/* HAMBURGER MENU BUTTON */}
+      <button className="menu-btn" onClick={() => setMenuOpen(true)} aria-label="Open menu">
+        <span /><span /><span />
+      </button>
+
+      {/* MENU DRAWER */}
+      {menuOpen && (
+        <>
+          <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />
+          <nav className="menu-drawer glass">
+            <div className="menu-head">
+              <div className="menu-title">Munro Weather</div>
+              <button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="Close menu">✕</button>
+            </div>
+            <button className="menu-item active" onClick={() => navTo('home')}>
+              <div className="menu-icon">🏔️</div>
+              <div>
+                <div className="menu-item-title">Today</div>
+                <div className="menu-item-sub">Current forecast</div>
+              </div>
+            </button>
+            <button className="menu-item" onClick={() => navTo('peaks')}>
+              <div className="menu-icon">🗻</div>
+              <div>
+                <div className="menu-item-title">All {sortedMunros.length} Peaks</div>
+                <div className="menu-item-sub">Browse and filter by region</div>
+              </div>
+            </button>
+            <button className="menu-item" onClick={() => navTo('map')}>
+              <div className="menu-icon">🗺️</div>
+              <div>
+                <div className="menu-item-title">Map of Scotland</div>
+                <div className="menu-item-sub">Interactive topographic map</div>
+              </div>
+            </button>
+            <button className="menu-item" onClick={() => navTo('wind')}>
+              <div className="menu-icon">🌬️</div>
+              <div>
+                <div className="menu-item-title">Live Wind Map</div>
+                <div className="menu-item-sub">Real-time wind across Scotland</div>
+              </div>
+            </button>
+            <div className="menu-footer">
+              Summit data: Open-Meteo<br/>
+              Risk model: MWIS methodology<br/>
+              Midge model: APS Biocontrol research
+            </div>
+          </nav>
+        </>
+      )}
+
+      <main className="content">
+        {/* SEARCH + REGION FILTERS */}
+        <div className="home-search">
+          <div className="search-row">
+            <input
+              className="search-input"
+              placeholder="Search 282 Munros..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && <button className="search-clear" onClick={() => setSearch('')}>✕</button>}
+          </div>
+          {search && filteredMunros.length > 0 && (
+            <div className="search-results glass">
+              {filteredMunros.slice(0, 8).map(m => (
+                <button key={m.name} className={`search-item ${m.name === munro.name ? 'active' : ''}`}
+                  onClick={() => { setMunro(m); setSearch(''); }}>
+                  <span className="search-name">{m.name}</span>
+                  <span className="search-meta">{m.h}m · {m.region}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="region-chips">
+            <button className={`chip ${!regionFilter ? 'active' : ''}`} onClick={() => setRegionFilter(null)}>All</button>
+            {REGIONS.slice(0, 8).map(r => (
+              <button key={r} className={`chip ${regionFilter === r ? 'active' : ''}`}
+                onClick={() => setRegionFilter(regionFilter === r ? null : r)}>{r}</button>
+            ))}
+          </div>
+          {regionFilter && (
+            <div className="region-filter-results">
+              <span>{filteredMunros.length} peaks in {regionFilter}</span>
+              <div className="region-chip-list">
+                {filteredMunros.slice(0, 6).map(m => (
+                  <button key={m.name} className={`region-peak-chip ${m.name === munro.name ? 'active' : ''}`}
+                    onClick={() => setMunro(m)}>
+                    {m.name} <span>{m.h}m</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* HERO — cinematic Highland panorama */}
+        <MunroHero
+          view={activeView}
+          munro={munro}
+          useF={useFahrenheit}
+          onUnitToggle={() => setUseFahrenheit(!useFahrenheit)}
+          onPickPeak={() => navTo('peaks')}
+          skyType={skyType}
+          hourBanner={
+            selectedMode === 'hour' ? (
+              <div className="mhero-hour-banner">
+                <span>Previewing {activeView.label}</span>
+                <button onClick={() => { setSelectedMode('current'); setSelectedIndex(0); }}>
+                  Back to now ×
+                </button>
+              </div>
+            ) : null
+          }
+        />
+
+        {/* CONDITIONS — always 4 cards + wind (moved under hero for prominence) */}
+        <section className="section">
+          <div className="section-title"><span>Conditions</span></div>
+          <div className="metrics">
+            <div className="metric glass wind-widget">
+              <div className="compass">
+                <svg viewBox="0 0 82 82">
+                  <circle cx="41" cy="41" r="36" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+                  <circle cx="41" cy="41" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+                  <text x="41" y="12" fill="rgba(245,245,247,.55)" fontSize="9" fontWeight="500" textAnchor="middle">N</text>
+                  <text x="76" y="44" fill="rgba(245,245,247,.35)" fontSize="9" fontWeight="500" textAnchor="middle">E</text>
+                  <text x="41" y="76" fill="rgba(245,245,247,.35)" fontSize="9" fontWeight="500" textAnchor="middle">S</text>
+                  <text x="6"  y="44" fill="rgba(245,245,247,.35)" fontSize="9" fontWeight="500" textAnchor="middle">W</text>
+                  <g transform={`rotate(${(activeView.bearing + 180) % 360} 41 41)`} className="compass-arrow">
+                    <path d="M41 12 L46 41 L41 36 L36 41 Z" fill="#60a5fa" />
+                  </g>
+                </svg>
+              </div>
+              <div className="wind-info">
+                <div className="wind-primary">{activeView.wind} <small>mph {activeView.windDirLabel}</small></div>
+                <div className="wind-gust">Gusting {activeView.gust} mph</div>
+                <div className="wind-bar">
+                  <div className="wind-fill" style={{ width: `${Math.min(100, activeView.wind * 2)}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="metric glass">
+              <div className="metric-head"><span>Visibility</span></div>
+              <div className="metric-value">{activeView.visibility != null ? activeView.visibility : '—'}<small>km</small></div>
+              <div className="metric-sub">{visibilityLabel(activeView.visibility)}</div>
+            </div>
+
+            <div className="metric glass">
+              <div className="metric-head"><span>Humidity</span></div>
+              <div className="metric-value">{activeView.humidity}<small>%</small></div>
+              <div className="metric-sub">{humidityLabel(activeView.humidity)}</div>
+            </div>
+
+            <div className="metric glass">
+              <div className="metric-head"><span>Pressure</span></div>
+              <div className="metric-value">{activeView.pressure || '—'}<small>hPa</small></div>
+              <div className="metric-sub">{pressureLabel(activeView.pressure)}</div>
+            </div>
+
+            <div className="metric glass">
+              <div className="metric-head"><span>Precipitation</span></div>
+              <div className="metric-value">{activeView.precip}<small>%</small></div>
+              <div className="metric-sub">{precipLabel(activeView.precip)}</div>
+            </div>
+          </div>
+        </section>
+
+        {/* RISK HUB — Overall + Mountain + Midge */}
+        <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} />
+
+        {/* 7-DAY STRIP */}
+        <nav className="forecast-strip glass" aria-label="7-day forecast">
+          {dailyViews.slice(0, 7).map((day, i) => {
+            const active = (selectedMode === 'day' && selectedIndex === i) ||
+                           (selectedMode === 'current' && i === 0);
+            return (
+              <button key={day.viewKey}
+                className={`strip-cell ${active ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedMode(i === 0 ? 'current' : 'day');
+                  setSelectedIndex(i);
+                }}
+                aria-pressed={active}>
+                <div className="strip-risk-dot" style={{ background: day.risk.riskColor, boxShadow: `0 0 6px ${day.risk.riskColor}` }} />
+                <div className="strip-day">{day.label}</div>
+                <div className="strip-icon"><WeatherIcon type={day.type} size={22} /></div>
+                <div className="strip-temp">{displayTemp(day.temp)}°</div>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* HOURLY — clickable */}
+        {hourlyViews.length > 0 && (
+          <section className="section">
+            <div className="section-title"><span>Hourly · tap to preview</span></div>
+            <div className="hourly-scroll">
+              {hourlyViews.map((h, i) => {
+                const active = selectedMode === 'hour' && selectedIndex === i;
+                const isCurrent = h.isNow && selectedMode !== 'hour';
+                return (
+                  <button key={h.viewKey}
+                    className={`hourly-cell glass ${active ? 'active' : ''} ${isCurrent ? 'current' : ''}`}
+                    onClick={() => { setSelectedMode('hour'); setSelectedIndex(i); }}>
+                    <div className="hourly-time">{h.label}</div>
+                    <div className="hourly-icon"><WeatherIcon type={h.type} size={20} /></div>
+                    <div className="hourly-temp">{displayTemp(h.temp)}°</div>
+                    <div className="hourly-risk-dot" style={{ background: h.risk.riskColor, boxShadow: `0 0 6px ${h.risk.riskColor}` }} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+
+        {/* ALERT for elevated risk */}
+        {activeView.risk.band >= 2 && (
+          <div className="alert" role="alert">
+            <div className="alert-icon">⚠️</div>
+            <div className="alert-body">
+              <div className="alert-title">Mountain Safety · {RISK_LABELS[activeView.risk.band]} risk</div>
+              <div className="alert-text">
+                {activeView.riskDesc} Always check MWIS (mwis.org.uk) for the
+                full regional summit forecast before departure.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 7-DAY OUTLOOK */}
+        <section className="section">
+          <div className="section-title"><span>7-day outlook</span></div>
+          <div className="outlook-grid">
+            {dailyViews.map((d, i) => {
+              const active = (selectedMode === 'day' && selectedIndex === i) ||
+                             (selectedMode === 'current' && i === 0);
+              return (
+                <button key={d.viewKey}
+                  className={`outlook-cell glass ${active ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedMode(i === 0 ? 'current' : 'day');
+                    setSelectedIndex(i);
+                  }}>
+                  <div className="outlook-day">{d.label}</div>
+                  <div className="outlook-icon"><WeatherIcon type={d.type} size={28} /></div>
+                  <div className="outlook-temps">
+                    {displayTemp(d.temp)}° <span>/ {displayTemp(d.tempMin)}°</span>
+                  </div>
+                  <div className="outlook-risk-badge-solid"
+                    style={{ background: d.risk.riskColor }}>
+                    {RISK_LABELS[d.risk.band]}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <footer className="app-footer">
+          Summit weather: Open-Meteo · Risk: MWIS methodology · Midge: APS Biocontrol research
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Peaks Page (full list)
+// ════════════════════════════════════════════════════════════════════════════
+function PeaksPage({ munros, currentMunro, regions, onSelect, onClose }) {
+  const [search, setSearch] = useState('');
+  const [region, setRegion] = useState(null);
+
+  const filtered = useMemo(() => {
+    let list = munros;
+    if (region) list = list.filter(m => m.region === region);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(m => m.name.toLowerCase().includes(q) || m.region.toLowerCase().includes(q));
+    }
+    return list;
+  }, [munros, region, search]);
+
+  return (
+    <div className="peaks-page">
+      <div className="peaks-header">
+        <div>
+          <div className="peaks-eyebrow">All Munros</div>
+          <div className="peaks-title">{filtered.length} of {munros.length}</div>
+        </div>
+        <button className="map-close" onClick={onClose} aria-label="Close">✕</button>
+      </div>
+
+      <div className="peaks-search-row">
+        <input className="peaks-search"
+          placeholder="Search peaks or region..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus />
+      </div>
+
+      <div className="peaks-chips">
+        <button className={`chip ${!region ? 'active' : ''}`} onClick={() => setRegion(null)}>All</button>
+        {regions.map(r => (
+          <button key={r} className={`chip ${region === r ? 'active' : ''}`}
+            onClick={() => setRegion(region === r ? null : r)}>{r}</button>
+        ))}
+      </div>
+
+      <div className="peaks-list">
+        {filtered.map(m => (
+          <button key={m.name}
+            className={`peak-item ${m.name === currentMunro.name ? 'active' : ''}`}
+            onClick={() => onSelect(m)}>
+            <div className="peak-info">
+              <div className="peak-name">{m.name}</div>
+              <div className="peak-region">{m.region}</div>
+            </div>
+            <div className="peak-height">{m.h}<small>m</small></div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1169 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Munro Weather v2 — Design System
+   ═══════════════════════════════════════════════════════════════════════════
+
+   1.  Reset & base
+   2.  Shell (.app, .content)
+   3.  Sky gradients (weather-driven)
+   4.  Weather FX particles
+   5.  Mountain silhouette
+   6.  Glass surface
+   7.  Hamburger menu + drawer
+   8.  Home search & region filter chips
+   9.  Hero
+  10.  Risk Hub — Overall + Mountain + Midge
+  11.  Expandable risk cards + factor breakdowns
+  12.  7-day forecast strip
+  13.  Hourly scroll
+  14.  Metrics panel
+  15.  Alert banner
+  16.  7-day outlook grid
+  17.  Peaks page (full list)
+  18.  Scotland map
+  19.  Reduced motion
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ─── 1. Reset & base ─────────────────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'SF Pro Text', sans-serif;
+  background: #050810;
+  color: #f5f5f7;
+  overflow-x: hidden;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button { font-family: inherit; }
+
+/* ─── 2. Shell ────────────────────────────────────────────────────────── */
+.app {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow-x: hidden;
+}
+.content {
+  position: relative;
+  z-index: 10;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 22px 60px;
+}
+
+/* ─── 3. Sky ──────────────────────────────────────────────────────────── */
+.sky {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  background: linear-gradient(180deg, #1a1f2e 0%, #2d3548 40%, #4a5268 70%, #6b7489 100%);
+  transition: background 1.4s cubic-bezier(.4, 0, .2, 1);
+}
+.app.sky-clear  .sky { background: linear-gradient(180deg, #0f1d3a 0%, #2d5082 30%, #6a9fc5 65%, #9ec6df 100%); }
+.app.sky-cloudy .sky { background: linear-gradient(180deg, #1a1f2e 0%, #2d3548 40%, #4a5268 70%, #6b7489 100%); }
+.app.sky-rain   .sky { background: linear-gradient(180deg, #1a1f2e 0%, #2d3548 40%, #4a5268 70%, #6b7489 100%); }
+.app.sky-storm  .sky { background: linear-gradient(180deg, #0c0f1a 0%, #1a1e2e 35%, #2e3548 65%, #3f4758 100%); }
+.app.sky-snow   .sky { background: linear-gradient(180deg, #1a2438 0%, #2d3d58 30%, #4a5f7a 55%, #6b7d95 75%, #8a9ab0 100%); }
+.app.sky-fog    .sky { background: linear-gradient(180deg, #2a3040 0%, #454d5e 40%, #6b7285 70%, #8a91a3 100%); }
+.sky::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 260px;
+  background: linear-gradient(180deg, transparent 0%, rgba(10, 13, 20, 0.4) 60%, rgba(10, 13, 20, 0.8) 100%);
+  pointer-events: none;
+}
+
+/* ─── 4. Weather FX ───────────────────────────────────────────────────── */
+.fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.wx-rain {
+  position: absolute; width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(180, 200, 230, 0.75));
+  transform: rotate(12deg); transform-origin: top;
+  animation: wx-raindrop linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes wx-raindrop {
+  0%   { transform: translateY(-40px) translateX(0) rotate(12deg); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { transform: translateY(110vh) translateX(-60px) rotate(12deg); opacity: 0; }
+}
+.wx-snow {
+  position: absolute; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  animation: wx-snowfall linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes wx-snowfall {
+  0%   { transform: translateY(-30px) translateX(0) rotate(0); opacity: 0; }
+  10%, 90% { opacity: 0.9; }
+  100% { transform: translateY(110vh) translateX(var(--drift, 40px)) rotate(360deg); opacity: 0; }
+}
+.wx-cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%; filter: blur(14px);
+  animation: wx-cloud-drift linear infinite;
+  will-change: transform;
+}
+@keyframes wx-cloud-drift {
+  0%   { transform: translateX(-200px); }
+  100% { transform: translateX(calc(100vw + 200px)); }
+}
+.wx-flash {
+  position: absolute; inset: 0;
+  background: rgba(200, 220, 255, 0);
+  animation: wx-lightning 8s infinite;
+  pointer-events: none;
+}
+@keyframes wx-lightning {
+  0%, 91%, 100% { background: rgba(200, 220, 255, 0); }
+  92% { background: rgba(200, 220, 255, 0.4); }
+  93% { background: rgba(200, 220, 255, 0); }
+  94% { background: rgba(200, 220, 255, 0.55); }
+  95% { background: rgba(200, 220, 255, 0); }
+}
+.wx-wind {
+  position: absolute; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: wx-wind-sweep linear infinite;
+  will-change: transform;
+}
+@keyframes wx-wind-sweep {
+  0%   { transform: translateX(-250px); }
+  100% { transform: translateX(calc(100vw + 100px)); }
+}
+.wx-fog-layer {
+  position: absolute; width: 140%; height: 100px;
+  background: radial-gradient(ellipse, rgba(200, 210, 225, 0.2), transparent 70%);
+  animation: wx-fog-drift linear infinite;
+  will-change: transform;
+}
+@keyframes wx-fog-drift {
+  0%   { transform: translateX(-40%); }
+  100% { transform: translateX(40%); }
+}
+.wx-sun-glow {
+  position: absolute;
+  top: 8%; right: 10%;
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 220, 150, 0.35), rgba(255, 220, 150, 0.08) 40%, transparent 65%);
+  animation: wx-sun-pulse 8s ease-in-out infinite;
+}
+@keyframes wx-sun-pulse {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.08); }
+}
+
+/* ─── 5. Mountain silhouette ──────────────────────────────────────────── */
+.mountains {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.mountains svg { width: 100%; display: block; }
+
+/* ─── 6. Glass surface ────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+/* ─── 7. Hamburger menu ───────────────────────────────────────────────── */
+.menu-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: 18px;
+  z-index: 30;
+  width: 42px; height: 42px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px; cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.menu-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.menu-btn:active { transform: scale(0.94); }
+.menu-btn span {
+  width: 18px; height: 1.5px;
+  background: #fff;
+  border-radius: 1px;
+  transition: transform 0.3s ease;
+}
+
+.menu-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(5, 8, 16, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 40;
+  animation: fade-in 0.25s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.menu-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: min(320px, 85vw);
+  z-index: 41;
+  background: rgba(12, 16, 26, 0.92) !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 18px 30px;
+  display: flex; flex-direction: column; gap: 6px;
+  border-radius: 0 !important;
+  border-left: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+  animation: drawer-slide 0.3s cubic-bezier(.4, 0, .2, 1);
+}
+@keyframes drawer-slide {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.menu-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.menu-title {
+  font-size: 11px; letter-spacing: 2px;
+  font-weight: 600; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.menu-close {
+  width: 32px; height: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff; cursor: pointer;
+  font-size: 14px;
+}
+.menu-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  color: #f5f5f7;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.menu-item:active { transform: scale(0.98); }
+.menu-item.active {
+  background: rgba(96, 165, 250, 0.15);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+.menu-icon { font-size: 22px; flex-shrink: 0; }
+.menu-item-title { font-size: 14px; font-weight: 500; letter-spacing: -0.1px; }
+.menu-item-sub { font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 2px; }
+.menu-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.7;
+  letter-spacing: 0.2px;
+}
+
+/* ─── 8. Home search & region chips ───────────────────────────────────── */
+.home-search {
+  position: relative;
+  margin-bottom: 8px;
+  padding-right: 56px; /* leave room for menu button */
+}
+.search-row { position: relative; }
+.search-input {
+  width: 100%;
+  padding: 12px 36px 12px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #f5f5f7;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.search-input:focus {
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+.search-input::placeholder { color: rgba(255, 255, 255, 0.35); }
+.search-clear {
+  position: absolute;
+  right: 10px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #fff; cursor: pointer;
+  font-size: 11px; line-height: 1;
+}
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px); left: 0; right: 56px;
+  z-index: 11;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  scrollbar-width: thin;
+}
+.search-results::-webkit-scrollbar { width: 3px; }
+.search-results::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 2px; }
+.search-item {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #f5f5f7;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.search-item:hover { background: rgba(255, 255, 255, 0.06); }
+.search-item.active { background: rgba(96, 165, 250, 0.14); }
+.search-name { font-size: 13px; font-weight: 500; }
+.search-meta { font-size: 10.5px; color: rgba(255, 255, 255, 0.5); }
+
+.region-chips {
+  display: flex; gap: 6px;
+  overflow-x: auto;
+  margin-top: 10px;
+  padding: 2px 0 8px;
+  scrollbar-width: none;
+}
+.region-chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.chip.active {
+  background: rgba(96, 165, 250, 0.2);
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #fff;
+}
+
+.region-filter-results {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.region-chip-list {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-top: 8px;
+}
+.region-peak-chip {
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.region-peak-chip:hover { background: rgba(255, 255, 255, 0.1); }
+.region-peak-chip.active {
+  background: rgba(96, 165, 250, 0.2);
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #fff;
+}
+.region-peak-chip span {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ─── 9. Hero ─────────────────────────────────────────────────────────── */
+/* The hero is now its own component — see MunroHero.jsx + MunroHero.css.
+   The old .hero / .temp-* styles have been removed to avoid conflicts. */
+
+/* ─── 10. Risk Hub — Overall card ─────────────────────────────────────── */
+.risk-hub {
+  display: flex; flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.overall-card {
+  padding: 16px 18px 14px;
+}
+.overall-head {
+  display: flex; align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.overall-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+.overall-score {
+  font-size: 32px;
+  font-weight: 200;
+  letter-spacing: -1.5px;
+  line-height: 1;
+}
+.overall-score span {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+  margin-left: 4px;
+  letter-spacing: -0.3px;
+}
+.overall-headline {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 14px;
+  letter-spacing: -0.1px;
+}
+.overall-bar-track {
+  position: relative;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: visible;
+}
+.overall-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(.4, 0, .2, 1);
+}
+.overall-bar-indicator {
+  position: absolute;
+  top: 50%;
+  width: 12px; height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.4), 0 0 16px rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  transition: left 0.8s cubic-bezier(.4, 0, .2, 1);
+}
+.overall-bands {
+  display: flex; justify-content: space-between;
+  margin-top: 10px;
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.3);
+}
+.overall-band.active {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ─── 11. Expandable risk cards ───────────────────────────────────────── */
+.risk-card {
+  transition: background 0.6s ease, border-color 0.6s ease;
+}
+
+.risk-card-head {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none; border: none;
+  color: #fff; text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-radius: 16px;
+}
+.risk-card-head:hover { background: rgba(255, 255, 255, 0.04); }
+
+.gauge {
+  flex-shrink: 0;
+  position: relative;
+  width: 46px; height: 46px;
+}
+.gauge svg { transform: rotate(-90deg); }
+.gauge-arc { transition: stroke-dashoffset 0.8s cubic-bezier(.4, 0, .2, 1), stroke 0.4s ease; }
+.gauge-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+
+.risk-card-info {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.risk-card-eyebrow {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+}
+.risk-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+}
+.risk-card-desc {
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.62);
+  line-height: 1.4;
+  margin-top: 1px;
+}
+.risk-card-chevron {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.3s ease;
+}
+.risk-card-chevron.rotated { transform: rotate(180deg); }
+
+.risk-card-body {
+  padding: 4px 16px 16px;
+  animation: expand 0.35s cubic-bezier(.4, 0, .2, 1);
+}
+@keyframes expand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Factor rows */
+.factor-eyebrow {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.8px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.factor-row { margin-bottom: 12px; }
+.factor-row:last-child { margin-bottom: 0; }
+.factor-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 4px; gap: 12px;
+}
+.factor-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.factor-value {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.factor-score {
+  margin-left: 6px;
+  font-weight: 700;
+}
+.factor-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.factor-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(.4, 0, .2, 1), background 0.4s ease;
+}
+.factor-explain {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 5px;
+  line-height: 1.5;
+  letter-spacing: 0.1px;
+  font-style: italic;
+}
+.factor-footnote {
+  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 14px;
+  line-height: 1.6;
+  letter-spacing: 0.1px;
+}
+
+/* Midge segments */
+.midge-segments {
+  display: flex; gap: 4px;
+  margin-bottom: 14px;
+}
+.midge-segment {
+  flex: 1; height: 6px;
+  border-radius: 3px;
+  transition: background 0.4s ease, opacity 0.4s ease;
+}
+.midge-dormant {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.55;
+  padding: 8px 0;
+  letter-spacing: 0.1px;
+}
+
+/* ─── 12. 7-day forecast strip ────────────────────────────────────────── */
+.forecast-strip {
+  display: flex; justify-content: space-between;
+  margin-top: 16px;
+  gap: 6px;
+  padding: 14px 10px;
+}
+.strip-cell {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  background: transparent;
+  border: none;
+  color: inherit;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.strip-cell:hover { background: rgba(255, 255, 255, 0.06); }
+.strip-cell:active { transform: scale(0.96); }
+.strip-cell.active {
+  background: rgba(96, 165, 250, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.45);
+}
+.strip-day {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  color: rgba(245, 245, 247, 0.7);
+  text-transform: uppercase;
+}
+.strip-cell.active .strip-day { color: #fff; }
+.strip-icon {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+}
+.strip-temp {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+}
+.strip-risk-dot {
+  position: absolute;
+  top: 1px; right: 8px;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+}
+
+/* ─── 13. Section + Hourly ────────────────────────────────────────────── */
+.section { margin-top: 26px; }
+.section-title {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 1.8px;
+  color: rgba(245, 245, 247, 0.55);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+
+.hourly-scroll {
+  display: flex; gap: 8px;
+  overflow-x: auto;
+  padding: 10px 2px 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+}
+.hourly-scroll::-webkit-scrollbar { display: none; }
+.hourly-cell {
+  flex-shrink: 0;
+  min-width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 4px 8px;
+  scroll-snap-align: start;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: inherit;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.hourly-cell:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+.hourly-cell:active { transform: scale(0.95); }
+.hourly-cell.current {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+.hourly-cell.active {
+  background: rgba(96, 165, 250, 0.22) !important;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.2);
+}
+.hourly-time {
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  color: rgba(245, 245, 247, 0.7);
+  font-weight: 500;
+}
+.hourly-cell.current .hourly-time,
+.hourly-cell.active .hourly-time { color: #fff; }
+.hourly-icon { width: 18px; height: 18px; }
+.hourly-temp {
+  font-size: 14px; font-weight: 500;
+  letter-spacing: -0.2px;
+}
+.hourly-risk-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+/* ─── 14. Metrics panel ───────────────────────────────────────────────── */
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.metric {
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.metric-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  color: rgba(245, 245, 247, 0.55);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.metric-value {
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: -0.8px;
+  line-height: 1;
+}
+.metric-value small {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(245, 245, 247, 0.55);
+  margin-left: 3px;
+  letter-spacing: -0.2px;
+}
+.metric-sub {
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.55);
+  margin-top: 6px;
+  letter-spacing: 0.05px;
+}
+.wind-widget {
+  grid-column: span 2;
+  display: flex; align-items: center; gap: 18px;
+}
+.compass { width: 82px; height: 82px; flex-shrink: 0; }
+.compass svg { width: 100%; height: 100%; }
+.compass-arrow { transition: transform 0.8s cubic-bezier(.4, 0, .2, 1); }
+.wind-info { flex: 1; min-width: 0; }
+.wind-primary {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: -0.8px;
+  margin-bottom: 3px;
+}
+.wind-primary small {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(245, 245, 247, 0.55);
+  margin-left: 6px;
+  letter-spacing: -0.2px;
+}
+.wind-gust {
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.6);
+  margin-bottom: 10px;
+}
+.wind-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.wind-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa, #3b82f6, #f59e0b);
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ─── 15. Alert ───────────────────────────────────────────────────────── */
+.alert {
+  margin-top: 24px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(245, 158, 11, 0.08));
+  border: 0.5px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+  display: flex; gap: 12px;
+  align-items: flex-start;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.alert-icon {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.alert-body { flex: 1; }
+.alert-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: #fca5a5;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+.alert-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(245, 245, 247, 0.85);
+}
+
+/* ─── 16. 7-day outlook grid ──────────────────────────────────────────── */
+.outlook-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.outlook-cell {
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 60px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: inherit;
+  border-radius: 10px;
+  border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s ease;
+}
+.outlook-cell:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+.outlook-cell:active { transform: scale(0.98); }
+.outlook-cell.active {
+  background: rgba(96, 165, 250, 0.22) !important;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.2);
+}
+.outlook-day {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: rgba(245, 245, 247, 0.9);
+  text-transform: uppercase;
+  min-width: 60px;
+}
+.outlook-icon { 
+  display: flex;
+  justify-content: center;
+  width: 20px;
+}
+.outlook-temps {
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+.outlook-temps span {
+  color: rgba(245, 245, 247, 0.5);
+}
+.outlook-risk-badge-solid {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 4px 10px;
+  min-width: 55px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Footer */
+.app-footer {
+  text-align: center;
+  padding: 30px 0 12px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.28);
+  letter-spacing: 0.3px;
+  line-height: 1.6;
+}
+
+/* ─── 17. Peaks page ──────────────────────────────────────────────────── */
+.peaks-page {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #0a0d14;
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px calc(env(safe-area-inset-bottom, 0px) + 30px);
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.peaks-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 16px;
+}
+.peaks-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+.peaks-title {
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.map-close {
+  width: 38px; height: 38px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.peaks-search-row { margin-bottom: 10px; }
+.peaks-search {
+  width: 100%;
+  padding: 13px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #f5f5f7;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+.peaks-search:focus { border-color: rgba(96, 165, 250, 0.5); }
+.peaks-search::placeholder { color: rgba(255, 255, 255, 0.35); }
+
+.peaks-chips {
+  display: flex; gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0 14px;
+  margin: 0 -18px;
+  padding-left: 18px;
+  padding-right: 18px;
+  scrollbar-width: none;
+}
+.peaks-chips::-webkit-scrollbar { display: none; }
+
+.peaks-list {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0 -18px;
+  padding: 0 18px;
+  scrollbar-width: thin;
+}
+.peak-item {
+  display: flex; align-items: center;
+  width: 100%;
+  padding: 13px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+  color: #f5f5f7;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.peak-item:hover { background: rgba(255, 255, 255, 0.04); }
+.peak-item.active { background: rgba(96, 165, 250, 0.12); }
+.peak-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.peak-name { font-size: 14px; font-weight: 500; letter-spacing: -0.1px; }
+.peak-region { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+.peak-height {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+.peak-height small {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 2px;
+}
+
+/* ─── 18. Scotland map ────────────────────────────────────────────────── */
+.map-overlay {
+  position: fixed; inset: 0;
+  z-index: 50;
+  background: #0a0d14;
+  display: flex; flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.map-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 12px;
+  background: rgba(10, 13, 20, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+  z-index: 2;
+}
+.map-title .map-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+.map-title .map-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+.map-viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+.map-controls {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  right: 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  z-index: 2;
+}
+.map-controls button {
+  width: 42px; height: 42px;
+  background: rgba(15, 20, 30, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.map-controls button:hover { background: rgba(30, 40, 55, 0.95); }
+.map-controls button:active { transform: scale(0.94); }
+.map-controls .reset-btn {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 1.2px;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  left: 18px;
+  background: rgba(15, 20, 30, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  z-index: 2;
+  max-width: 200px;
+}
+.legend-title {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.legend-scale {
+  display: flex; gap: 8px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.legend-colour {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.legend-loading {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #60a5fa;
+  letter-spacing: 0.5px;
+}
+
+/* ─── 19. Reduced motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

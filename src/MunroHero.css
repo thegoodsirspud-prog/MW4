@@ -1,0 +1,368 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   MunroHero — Cinematic Highland Panorama
+   ───────────────────────────────────────────────────────────────────────
+   The hero card composites a four-layer ridge scene with editorial
+   typography. Designed to feel like the cover of a Scottish Mountaineering
+   Club yearbook rather than a weather widget.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.mhero {
+  position: relative;
+  margin: 10px 0 24px;
+  border-radius: 22px;
+  overflow: hidden;
+  min-height: 320px;
+  isolation: isolate;
+  box-shadow:
+    0 20px 60px -20px rgba(0, 0, 0, 0.6),
+    0 4px 16px -4px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  background: #0a0d14;
+
+  /* subtle lift on container — entire card is interactive */
+  transition: transform 0.6s cubic-bezier(.16, 1, .3, 1);
+}
+
+.mhero:hover { transform: translateY(-2px); }
+
+/* ── The SVG scene sits behind content, fills the card ─────────────── */
+.mhero-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.mhero-scene g {
+  transition: transform 0.4s cubic-bezier(.16, 1, .3, 1);
+}
+
+/* ── Content layer ─────────────────────────────────────────────────── */
+.mhero-content {
+  position: relative;
+  z-index: 2;
+  padding: 22px 22px 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 320px;
+}
+
+/* ── Top: eyebrow + peak picker ────────────────────────────────────── */
+.mhero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mhero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: rgba(245, 245, 247, 0.78);
+  padding: 7px 12px;
+  background: rgba(10, 13, 20, 0.35);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 100px;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.mhero-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #60e3a6;
+  box-shadow:
+    0 0 0 2px rgba(96, 227, 166, 0.2),
+    0 0 10px rgba(96, 227, 166, 0.6);
+  animation: mhero-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes mhero-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.7; transform: scale(0.82); }
+}
+
+.mhero-peak {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 9px 14px 10px;
+  background: rgba(10, 13, 20, 0.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  color: #f5f5f7;
+  cursor: pointer;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  font-family: inherit;
+  max-width: 65%;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  position: relative;
+}
+
+.mhero-peak:hover {
+  background: rgba(10, 13, 20, 0.55);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.mhero-peak:active {
+  transform: scale(0.97);
+}
+
+.mhero-peak-name {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  line-height: 1.15;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.mhero-peak-sub {
+  font-size: 10px;
+  color: rgba(245, 245, 247, 0.62);
+  letter-spacing: 0.4px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.mhero-peak-chev {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.6;
+}
+
+/* ── Bottom: temperature + conditions ──────────────────────────────── */
+.mhero-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+/* ── Temperature — the star of the show ────────────────────────────── */
+.mhero-temp-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mhero-temp {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  position: relative;
+  line-height: 1;
+  transition: transform 0.3s cubic-bezier(.34, 1.56, .64, 1);
+  user-select: none;
+}
+
+.mhero-temp:active { transform: scale(0.96); }
+
+.mhero-temp-primary {
+  display: inline-flex;
+  align-items: flex-start;
+  line-height: 0.9;
+  color: #ffffff;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+.mhero-temp-number {
+  /* Montserrat bold — solid, trustworthy, modern */
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 108px;
+  font-weight: 700;
+  letter-spacing: -3px;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #ffffff 55%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+  animation: mhero-temp-enter 0.8s cubic-bezier(.16, 1, .3, 1);
+}
+
+@keyframes mhero-temp-enter {
+  0%   { opacity: 0; transform: scale(0.92) translateY(8px); filter: blur(6px); }
+  50%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+
+.mhero-temp-unit {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  margin-top: 14px;
+  margin-left: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.9);
+}
+
+/* The secondary unit — sits below-left, much smaller, hint of italic */
+.mhero-temp-secondary {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 2px;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  padding-left: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: color 0.2s ease, opacity 0.3s ease;
+}
+
+.mhero-temp-secondary::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 8px;
+  height: 0.5px;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-50%);
+}
+
+.mhero-temp:hover .mhero-temp-secondary {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Swap indicator — visual cue at top-right of temp */
+.mhero-temp::after {
+  content: '⇌';
+  position: absolute;
+  top: -2px;
+  right: -22px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.2s ease, transform 0.4s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+.mhero-temp:hover::after {
+  color: rgba(255, 255, 255, 0.85);
+  transform: rotate(180deg);
+}
+
+/* ── Conditions panel (right side) ─────────────────────────────────── */
+.mhero-meta {
+  text-align: right;
+  padding-bottom: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mhero-cond {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: #ffffff;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(0, 0, 0, 0.3);
+  margin-bottom: 5px;
+  line-height: 1.2;
+}
+
+.mhero-feels {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Hour-preview banner when user is looking at a non-now hour ────── */
+.mhero-hour-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 9px 14px;
+  background: rgba(96, 165, 250, 0.18);
+  border: 0.5px solid rgba(96, 165, 250, 0.4);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-size: 12px;
+  color: rgba(180, 210, 250, 1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.mhero-hour-banner button {
+  background: rgba(96, 165, 250, 0.2);
+  border: 0.5px solid rgba(96, 165, 250, 0.35);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease;
+}
+
+.mhero-hour-banner button:hover {
+  background: rgba(96, 165, 250, 0.35);
+}
+
+/* ── Responsive tightening for narrow phones ───────────────────────── */
+@media (max-width: 380px) {
+  .mhero { min-height: 300px; }
+  .mhero-temp-number { font-size: 92px; letter-spacing: -4.5px; }
+  .mhero-temp-unit   { font-size: 32px; margin-top: 12px; }
+  .mhero-peak        { max-width: 58%; }
+  .mhero-peak-name   { font-size: 13px; }
+  .mhero-content     { padding: 18px 18px 22px; min-height: 300px; }
+}
+
+/* ── Respect reduced-motion ────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .mhero:hover            { transform: none; }
+  .mhero-scene g          { transition: none; }
+  .mhero-temp-number      { animation: none; }
+  .mhero-dot              { animation: none; }
+}
