@@ -3,34 +3,38 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 /**
- * MunroWindMap — Windy.com-style animated wind field
+ * MunroWindMap — flowing particle wind field, Windy.com aesthetic
  *
- * Replaces the old 282-DOM-arrows implementation. That approach put 282
- * React components on top of the map and re-projected each one on every
- * pan/zoom — the cause of the lag.
+ * The trick Windy uses (and that my first attempt missed) is framebuffer
+ * accumulation. Instead of drawing particles-as-dots every frame to the
+ * screen, we draw into a persistent texture. Each frame:
  *
- * This implementation:
- * 1. Samples wind on a 16×12 = 192 grid covering Scotland (parallel fetch).
- * 2. Renders ~5000 particles via a MapLibre CustomLayer. Each frame, every
- *    particle samples the wind vector at its position via bilinear
- *    interpolation, advances by velocity * dt, and draws as a point.
- * 3. Particles fade with age and respawn when they expire or leave bounds.
+ *   1. Bind the accumulation framebuffer
+ *   2. Draw a subtly-dark semi-transparent quad over it so old trails
+ *      fade slightly (95-97% opacity = ~25 frame persistence)
+ *   3. Draw particles as LINE segments from previous → current position
+ *   4. Unbind; blit the accumulation texture to the screen
  *
- * Result: a flowing river of wind across Scotland, single GL draw call per
- * frame, ~60fps. The map stays fully interactive.
+ * Result: gentle flowing streaks instead of random dots. The map stays
+ * calm and readable; wind has direction AND continuity.
  *
- * Design colour: cyan-to-white particles. Iconic, reads at a glance against
- * the dark CARTO basemap, identical visual language to Windy.com.
+ * Everything else stays the same: 192-point wind grid sampled from
+ * Open-Meteo, cached 15 min, bilinear interpolation, MapLibre
+ * CustomLayer for seamless integration.
  */
 
-// Geographic bounds, padded around mainland Scotland + Hebrides + Skye + Orkney.
 const BOUNDS = { west: -7.8, east: -1.5, south: 55.5, north: 59.0 };
 const GRID_W = 16;
 const GRID_H = 12;
-const PARTICLE_COUNT = 5000;
-const PARTICLE_LIFE = 60;          // frames before respawn
-const PARTICLE_SPEED_MULT = 0.0008; // tunes visual speed
-const DATA_CACHE_MS = 15 * 60 * 1000; // 15 min
+
+// Particle tuning — calmer than v1. Fewer particles, longer life, slower
+// visual speed. Trail fade holds them on screen 25ish frames at 0.96
+// which is ~0.4s of visible trail at 60fps — feels like flowing wind.
+const PARTICLE_COUNT = 2500;
+const PARTICLE_LIFE_FRAMES = 120;
+const PARTICLE_SPEED_MULT = 0.00035;  // half the speed of v1
+const FADE_ALPHA = 0.04;              // higher = shorter trails. 0.04 = long & gentle
+const DATA_CACHE_MS = 15 * 60 * 1000;
 
 let cachedGrid = null;
 let cachedAt = 0;
@@ -54,18 +58,16 @@ async function fetchWindGrid() {
       const data = await res.json();
       const speed = data.current?.wind_speed_10m ?? 0;
       const dir = data.current?.wind_direction_10m ?? 0;
-      // dir is degrees clockwise from N (FROM direction).
-      // We want the TO vector, which points opposite (dir + 180).
+      // Meteorological dir is the FROM direction; flow points the other way.
       const angle = ((dir + 180) % 360) * Math.PI / 180;
-      const u = Math.sin(angle) * speed;  // east component (m/s)
-      const v = Math.cos(angle) * speed;  // north component (m/s)
+      const u = Math.sin(angle) * speed;  // east m/s
+      const v = Math.cos(angle) * speed;  // north m/s
       return { i: p.i, j: p.j, u, v, speed };
     } catch {
       return { i: p.i, j: p.j, u: 0, v: 0, speed: 0 };
     }
   }));
 
-  // Flat Float32Array, [u, v, speed, _] per cell, row-major.
   const data = new Float32Array(GRID_W * GRID_H * 4);
   let maxSpeed = 0;
   for (const r of results) {
@@ -82,105 +84,130 @@ async function fetchWindGrid() {
   return cachedGrid;
 }
 
-/**
- * Build a MapLibre CustomLayer that renders the particle field. Owns its
- * GL state (program, buffers, particle positions/ages) and is driven by
- * the map's render loop via map.triggerRepaint() at the end of each frame.
- */
 function makeWindParticleLayer(gridData) {
   return {
     id: 'wind-particles',
     type: 'custom',
     renderingMode: '2d',
-    map: null,
-    program: null,
-    posBuffer: null,
-    ageBuffer: null,
-    particles: null,
-    ages: null,
 
     onAdd(map, gl) {
       this.map = map;
 
-      const vertexSrc = `
+      // ── Shader 1: draw particle trails (lines) ─────────────────────
+      const trailVs = `
         attribute vec2 a_pos;
-        attribute float a_age;
         attribute float a_intensity;
         uniform mat4 u_matrix;
-        varying float v_age;
         varying float v_intensity;
         void main() {
           gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
-          gl_PointSize = 2.0;
-          v_age = a_age;
           v_intensity = a_intensity;
         }
       `;
-      const fragmentSrc = `
+      const trailFs = `
         precision mediump float;
-        varying float v_age;
         varying float v_intensity;
         void main() {
-          float life = 1.0 - v_age;
-          // Cyan when slow, white when fast. Intensity 0-1 = wind speed normalised.
-          vec3 cool = vec3(0.40, 0.85, 1.00);  // cyan
-          vec3 hot  = vec3(1.00, 1.00, 1.00);  // white
-          vec3 col  = mix(cool, hot, clamp(v_intensity, 0.0, 1.0));
-          gl_FragColor = vec4(col, life * 0.85);
+          // Cyan → pale white as intensity rises. Windy's calmer range.
+          vec3 cool = vec3(0.55, 0.80, 0.95);   // soft cyan
+          vec3 warm = vec3(0.90, 0.95, 1.00);   // pale white, never fully saturated
+          vec3 col  = mix(cool, warm, clamp(v_intensity, 0.0, 1.0));
+          gl_FragColor = vec4(col, 0.85);
         }
       `;
+      this.trailProgram = linkProgram(gl, trailVs, trailFs);
+      this.tPos       = gl.getAttribLocation(this.trailProgram, 'a_pos');
+      this.tIntensity = gl.getAttribLocation(this.trailProgram, 'a_intensity');
+      this.tMatrix    = gl.getUniformLocation(this.trailProgram, 'u_matrix');
 
-      const vs = gl.createShader(gl.VERTEX_SHADER);
-      gl.shaderSource(vs, vertexSrc);
-      gl.compileShader(vs);
-      if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-        console.error('[Wind] vertex shader', gl.getShaderInfoLog(vs));
-      }
-      const fs = gl.createShader(gl.FRAGMENT_SHADER);
-      gl.shaderSource(fs, fragmentSrc);
-      gl.compileShader(fs);
-      if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-        console.error('[Wind] fragment shader', gl.getShaderInfoLog(fs));
-      }
-      this.program = gl.createProgram();
-      gl.attachShader(this.program, vs);
-      gl.attachShader(this.program, fs);
-      gl.linkProgram(this.program);
-      if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
-        console.error('[Wind] program link', gl.getProgramInfoLog(this.program));
-      }
+      // ── Shader 2: fade-and-blit the accumulation texture ───────────
+      const screenVs = `
+        attribute vec2 a_pos;
+        varying vec2 v_uv;
+        void main() {
+          gl_Position = vec4(a_pos, 0.0, 1.0);
+          v_uv = a_pos * 0.5 + 0.5;
+        }
+      `;
+      const screenFs = `
+        precision mediump float;
+        uniform sampler2D u_tex;
+        uniform float u_fade;
+        varying vec2 v_uv;
+        void main() {
+          vec4 c = texture2D(u_tex, v_uv);
+          // Multiply alpha down each frame so old trails fade gracefully.
+          gl_FragColor = vec4(c.rgb, c.a * (1.0 - u_fade));
+        }
+      `;
+      this.screenProgram = linkProgram(gl, screenVs, screenFs);
+      this.sPos   = gl.getAttribLocation(this.screenProgram, 'a_pos');
+      this.sTex   = gl.getUniformLocation(this.screenProgram, 'u_tex');
+      this.sFade  = gl.getUniformLocation(this.screenProgram, 'u_fade');
 
-      this.aPos       = gl.getAttribLocation(this.program, 'a_pos');
-      this.aAge       = gl.getAttribLocation(this.program, 'a_age');
-      this.aIntensity = gl.getAttribLocation(this.program, 'a_intensity');
-      this.uMatrix    = gl.getUniformLocation(this.program, 'u_matrix');
+      // Full-screen quad for the blit pass
+      this.quadBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,  1, -1,  -1, 1,
+        -1,  1,  1, -1,   1, 1,
+      ]), gl.STATIC_DRAW);
 
-      // Particles in MapLibre Mercator coords (0..1 across the world).
-      // u_matrix handles all camera projection automatically.
-      this.particles  = new Float32Array(PARTICLE_COUNT * 2);
-      this.ages       = new Float32Array(PARTICLE_COUNT);
-      this.intensities = new Float32Array(PARTICLE_COUNT);
+      // Particles live in Mercator coords (0..1 world space).
+      // For line drawing we upload pairs (prev, current) per particle.
+      this.particles = new Float32Array(PARTICLE_COUNT * 4);  // x, y, prevX, prevY
+      this.intensities = new Float32Array(PARTICLE_COUNT * 2); // per-vertex
+      this.ages = new Float32Array(PARTICLE_COUNT);
       for (let i = 0; i < PARTICLE_COUNT; i++) this.respawn(i);
 
-      this.posBuffer       = gl.createBuffer();
-      this.ageBuffer       = gl.createBuffer();
+      this.lineBuffer      = gl.createBuffer();
       this.intensityBuffer = gl.createBuffer();
+
+      // Accumulation framebuffer — same size as the map viewport
+      this.setupFramebuffer(gl);
+      this.resizeIfNeeded(gl);
+    },
+
+    setupFramebuffer(gl) {
+      this.accumTexture = gl.createTexture();
+      this.accumFb = gl.createFramebuffer();
+      this.fbW = 0;
+      this.fbH = 0;
+    },
+
+    resizeIfNeeded(gl) {
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
+      if (w === this.fbW && h === this.fbH) return;
+      this.fbW = w;
+      this.fbH = h;
+
+      gl.bindTexture(gl.TEXTURE_2D, this.accumTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.accumFb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.accumTexture, 0);
+      // Clear fresh
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     },
 
     respawn(i) {
       const lon = BOUNDS.west + Math.random() * (BOUNDS.east - BOUNDS.west);
       const lat = BOUNDS.south + Math.random() * (BOUNDS.north - BOUNDS.south);
       const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat]);
-      this.particles[i * 2 + 0] = merc.x;
-      this.particles[i * 2 + 1] = merc.y;
-      this.ages[i] = Math.random();  // stagger so respawn doesn't pulse
-      this.intensities[i] = 0;
+      this.particles[i * 4 + 0] = merc.x;
+      this.particles[i * 4 + 1] = merc.y;
+      this.particles[i * 4 + 2] = merc.x;
+      this.particles[i * 4 + 3] = merc.y;
+      this.ages[i] = Math.random() * PARTICLE_LIFE_FRAMES;
     },
 
-    /**
-     * Sample wind at a Mercator coord. Bilinear interpolation inside bounds.
-     * Returns m/s and a 0-1 intensity for shader colour mixing.
-     */
     sampleWind(mercX, mercY) {
       const ll = new maplibregl.MercatorCoordinate(mercX, mercY).toLngLat();
       const lon = ll.lng;
@@ -195,85 +222,140 @@ function makeWindParticleLayer(gridData) {
       const j1 = Math.min(j0 + 1, GRID_H - 1);
       const dx = fx - i0, dy = fy - j0;
 
-      const sample = (i, j) => {
+      const s = (i, j) => {
         const idx = (j * GRID_W + i) * 4;
         return [gridData.data[idx], gridData.data[idx + 1], gridData.data[idx + 2]];
       };
-      const [au, av, asp] = sample(i0, j0);
-      const [bu, bv, bsp] = sample(i1, j0);
-      const [cu, cv, csp] = sample(i0, j1);
-      const [du, dv, dsp] = sample(i1, j1);
-
+      const [au, av, asp] = s(i0, j0);
+      const [bu, bv, bsp] = s(i1, j0);
+      const [cu, cv, csp] = s(i0, j1);
+      const [du, dv, dsp] = s(i1, j1);
       const tu = au * (1 - dx) + bu * dx;
       const tv = av * (1 - dx) + bv * dx;
       const ts = asp * (1 - dx) + bsp * dx;
       const xu = cu * (1 - dx) + du * dx;
       const xv = cv * (1 - dx) + dv * dx;
       const xs = csp * (1 - dx) + dsp * dx;
-
       const speed = ts * (1 - dy) + xs * dy;
-      const intensity = Math.min(1, speed / 25);  // 25 m/s ~ 56 mph = max heat
       return {
         u: tu * (1 - dy) + xu * dy,
         v: tv * (1 - dy) + xv * dy,
-        intensity,
+        intensity: Math.min(1, speed / 22),  // 22 m/s ~ 49 mph visual ceiling
         speed,
       };
     },
 
     render(gl, matrix) {
-      // Step every particle
+      this.resizeIfNeeded(gl);
+
+      // Step particles in CPU — store prev, advance, update intensity, age.
       for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const x = this.particles[i * 2 + 0];
-        const y = this.particles[i * 2 + 1];
+        const pi = i * 4;
+        const x = this.particles[pi + 0];
+        const y = this.particles[pi + 1];
+        this.particles[pi + 2] = x;
+        this.particles[pi + 3] = y;
         const wind = this.sampleWind(x, y);
+        // Mercator y is inverted vs lat (north = smaller y), so flip v.
+        this.particles[pi + 0] = x + wind.u * PARTICLE_SPEED_MULT;
+        this.particles[pi + 1] = y + (-wind.v) * PARTICLE_SPEED_MULT;
+        // Intensity for both vertices of the line segment
+        this.intensities[i * 2 + 0] = wind.intensity;
+        this.intensities[i * 2 + 1] = wind.intensity;
 
-        // Mercator y is inverted vs latitude (north = smaller y), so flip v.
-        const dx = wind.u * PARTICLE_SPEED_MULT;
-        const dy = -wind.v * PARTICLE_SPEED_MULT;
-        this.particles[i * 2 + 0] = x + dx;
-        this.particles[i * 2 + 1] = y + dy;
-        this.intensities[i] = wind.intensity;
-
-        this.ages[i] += 1 / PARTICLE_LIFE;
-        if (this.ages[i] >= 1 || wind.speed < 0.05) {
+        this.ages[i]++;
+        if (this.ages[i] >= PARTICLE_LIFE_FRAMES || wind.speed < 0.05) {
           this.respawn(i);
         }
       }
 
-      gl.useProgram(this.program);
-      gl.uniformMatrix4fv(this.uMatrix, false, matrix);
+      // ── PASS 1: draw faded previous frame + new trails into framebuffer ──
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.accumFb);
+      gl.viewport(0, 0, this.fbW, this.fbH);
 
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.posBuffer);
+      // Fade the existing accumulation by drawing it to itself with reduced alpha
+      gl.useProgram(this.screenProgram);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.accumTexture);
+      gl.uniform1i(this.sTex, 0);
+      gl.uniform1f(this.sFade, FADE_ALPHA);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+      gl.enableVertexAttribArray(this.sPos);
+      gl.vertexAttribPointer(this.sPos, 2, gl.FLOAT, false, 0, 0);
+      gl.disable(gl.BLEND);  // overwrite — this IS the fade pass
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      // Now draw fresh particle lines on top of the faded previous frame
+      gl.useProgram(this.trailProgram);
+      gl.uniformMatrix4fv(this.tMatrix, false, matrix);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, this.particles, gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(this.aPos);
-      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.ageBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, this.ages, gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(this.aAge);
-      gl.vertexAttribPointer(this.aAge, 1, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(this.tPos);
+      gl.vertexAttribPointer(this.tPos, 2, gl.FLOAT, false, 0, 0);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.intensityBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, this.intensities, gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(this.aIntensity);
-      gl.vertexAttribPointer(this.aIntensity, 1, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(this.tIntensity);
+      gl.vertexAttribPointer(this.tIntensity, 1, gl.FLOAT, false, 0, 0);
 
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);  // additive — bright streaks build
-      gl.drawArrays(gl.POINTS, 0, PARTICLE_COUNT);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArrays(gl.LINES, 0, PARTICLE_COUNT * 2);
 
-      // Keep the animation going even when the camera is idle
+      // ── PASS 2: blit the accumulation to the screen ───────────────
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, this.fbW, this.fbH);
+
+      gl.useProgram(this.screenProgram);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.accumTexture);
+      gl.uniform1i(this.sTex, 0);
+      gl.uniform1f(this.sFade, 0);  // no fade on the final blit
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+      gl.enableVertexAttribArray(this.sPos);
+      gl.vertexAttribPointer(this.sPos, 2, gl.FLOAT, false, 0, 0);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
       this.map.triggerRepaint();
     },
 
     onRemove(_map, gl) {
-      if (this.program) gl.deleteProgram(this.program);
-      if (this.posBuffer) gl.deleteBuffer(this.posBuffer);
-      if (this.ageBuffer) gl.deleteBuffer(this.ageBuffer);
+      if (this.trailProgram) gl.deleteProgram(this.trailProgram);
+      if (this.screenProgram) gl.deleteProgram(this.screenProgram);
+      if (this.lineBuffer) gl.deleteBuffer(this.lineBuffer);
       if (this.intensityBuffer) gl.deleteBuffer(this.intensityBuffer);
+      if (this.quadBuffer) gl.deleteBuffer(this.quadBuffer);
+      if (this.accumTexture) gl.deleteTexture(this.accumTexture);
+      if (this.accumFb) gl.deleteFramebuffer(this.accumFb);
     },
   };
+}
+
+/** Compile + link a GL program. Logs errors but never throws. */
+function linkProgram(gl, vsSrc, fsSrc) {
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, vsSrc);
+  gl.compileShader(vs);
+  if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+    console.error('[Wind vs]', gl.getShaderInfoLog(vs));
+  }
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, fsSrc);
+  gl.compileShader(fs);
+  if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+    console.error('[Wind fs]', gl.getShaderInfoLog(fs));
+  }
+  const p = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('[Wind link]', gl.getProgramInfoLog(p));
+  }
+  return p;
 }
 
 export default function MunroWindMap({ onClose }) {
@@ -303,8 +385,7 @@ export default function MunroWindMap({ onClose }) {
       try {
         const grid = await fetchWindGrid();
         setMaxSpeedMs(grid.maxSpeed);
-        const layer = makeWindParticleLayer(grid);
-        map.addLayer(layer);
+        map.addLayer(makeWindParticleLayer(grid));
         setStatus('ready');
       } catch (err) {
         console.error('[Wind] failed', err);
