@@ -1194,6 +1194,22 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           }
         />
 
+        {/* ALERT for elevated risk — placed immediately after the hero so
+            safety information is the very first thing after the active
+            forecast, not buried at the bottom of the page. */}
+        {activeView.risk.band >= 2 && (
+          <div className="alert" role="alert">
+            <div className="alert-icon">⚠️</div>
+            <div className="alert-body">
+              <div className="alert-title">Mountain Safety · {RISK_LABELS[activeView.risk.band]} risk</div>
+              <div className="alert-text">
+                {activeView.riskDesc} Always check MWIS (mwis.org.uk) for the
+                full regional summit forecast before departure.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* HOURLY — clickable (placed above daily for tap-to-preview-first flow) */}
         {hourlyViews.length > 0 && (
           <section className="section">
@@ -1297,21 +1313,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 
         {/* RISK HUB — Overall + Mountain + Midge */}
         <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} />
-
-
-        {/* ALERT for elevated risk */}
-        {activeView.risk.band >= 2 && (
-          <div className="alert" role="alert">
-            <div className="alert-icon">⚠️</div>
-            <div className="alert-body">
-              <div className="alert-title">Mountain Safety · {RISK_LABELS[activeView.risk.band]} risk</div>
-              <div className="alert-text">
-                {activeView.riskDesc} Always check MWIS (mwis.org.uk) for the
-                full regional summit forecast before departure.
-              </div>
-            </div>
-          </div>
-        )}
 
         <footer className="app-footer">
           Summit weather: Open-Meteo · Risk: MWIS methodology · Midge: APS Biocontrol research
