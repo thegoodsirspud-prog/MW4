@@ -15,6 +15,8 @@ import MunroHero from './MunroHero.jsx';
 // MunroTileMap pulls in MapLibre (~200KB gzipped) — code-split so the home
 // page stays tiny. Only users who open /map pay the download cost.
 const MunroTileMap = lazy(() => import('./MunroTileMap.jsx'));
+const MunroWindMap = lazy(() => import('./MunroWindMap.jsx'));
+const BestPeakToday = lazy(() => import('./BestPeakToday.jsx'));
 import './App.css';
 import './MunroHero.css';
 
@@ -950,12 +952,21 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
     );
   }
   if (page === 'wind') {
-    return <ScotlandMap
-      onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
-      selectedMunro={munro}
-      onClose={() => setPage('home')}
-      mode="wind"
-    />;
+    return (
+      <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Live Wind Map</div><div className="map-subtitle">Loading…</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close map">✕</button></div></div>}>
+        <MunroWindMap onClose={() => setPage('home')} />
+      </Suspense>
+    );
+  }
+  if (page === 'best') {
+    return (
+      <Suspense fallback={<div className="best-peak-overlay"><div className="best-peak-header"><div><div className="best-peak-eyebrow">Today's Recommendations</div><div className="best-peak-title">Best peaks to climb</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close">✕</button></div></div>}>
+        <BestPeakToday
+          onSelectPeak={(m) => { setMunro(m); setPage('home'); }}
+          onClose={() => setPage('home')}
+        />
+      </Suspense>
+    );
   }
 
   // ────── Peaks full list view
@@ -1040,6 +1051,13 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
               <div>
                 <div className="menu-item-title">Today</div>
                 <div className="menu-item-sub">Current forecast</div>
+              </div>
+            </button>
+            <button className="menu-item menu-item-feature" onClick={() => navTo('best')}>
+              <div className="menu-icon">✨</div>
+              <div>
+                <div className="menu-item-title">Best Peaks Today</div>
+                <div className="menu-item-sub">Live conditions across 28 iconic summits</div>
               </div>
             </button>
             <button className="menu-item" onClick={() => navTo('peaks')}>
