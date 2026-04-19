@@ -76,22 +76,52 @@ const precipLabel = (p) =>
 // ────────────────────────────────────────────────────────────────────────────
 // WeatherIcon — hand-built SVG per sky type
 // ────────────────────────────────────────────────────────────────────────────
-function WeatherIcon({ type, size = 20 }) {
+function WeatherIcon({ type, size = 20, night = false }) {
   const attrs = {
     viewBox: '0 0 20 20', width: size, height: size,
     fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
     strokeLinecap: 'round', strokeLinejoin: 'round',
   };
-  if (type === 'clear') return (
-    <svg {...attrs}>
-      <circle cx="10" cy="10" r="3.5" fill="#fbbf24" stroke="#fbbf24" />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map(a => {
-        const r = (a * Math.PI) / 180;
-        return <line key={a} x1={10 + Math.cos(r) * 5.5} y1={10 + Math.sin(r) * 5.5} x2={10 + Math.cos(r) * 7.5} y2={10 + Math.sin(r) * 7.5} stroke="#fbbf24" />;
-      })}
-    </svg>
-  );
-  if (type === 'cloudy') return <svg {...attrs}><path d="M5.5 13 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.25)" stroke="rgba(255,255,255,.8)" /></svg>;
+  // Clear: sun by day, moon by night. The crescent is a circle minus an
+  // offset circle — clean, recognisable at small sizes.
+  if (type === 'clear') {
+    if (night) return (
+      <svg {...attrs}>
+        <defs>
+          <mask id={`moon-mask-${size}`}>
+            <rect width="20" height="20" fill="white" />
+            <circle cx="13" cy="8" r="5" fill="black" />
+          </mask>
+        </defs>
+        <circle cx="10" cy="10" r="5.5" fill="#dce6f5" stroke="#dce6f5" mask={`url(#moon-mask-${size})`} />
+      </svg>
+    );
+    return (
+      <svg {...attrs}>
+        <circle cx="10" cy="10" r="3.5" fill="#fbbf24" stroke="#fbbf24" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map(a => {
+          const r = (a * Math.PI) / 180;
+          return <line key={a} x1={10 + Math.cos(r) * 5.5} y1={10 + Math.sin(r) * 5.5} x2={10 + Math.cos(r) * 7.5} y2={10 + Math.sin(r) * 7.5} stroke="#fbbf24" />;
+        })}
+      </svg>
+    );
+  }
+  // Cloudy at night: moon-behind-cloud composition
+  if (type === 'cloudy') {
+    if (night) return (
+      <svg {...attrs}>
+        <defs>
+          <mask id={`night-cloud-mask-${size}`}>
+            <rect width="20" height="20" fill="white" />
+            <circle cx="9" cy="6" r="2.8" fill="black" />
+          </mask>
+        </defs>
+        <circle cx="6" cy="7" r="3" fill="#dce6f5" mask={`url(#night-cloud-mask-${size})`} />
+        <path d="M5.5 13 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.25)" stroke="rgba(255,255,255,.8)" />
+      </svg>
+    );
+    return <svg {...attrs}><path d="M5.5 13 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.25)" stroke="rgba(255,255,255,.8)" /></svg>;
+  }
   if (type === 'rain') return <svg {...attrs}><path d="M5.5 10 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.8)" /><line x1="7" y1="13" x2="6" y2="17" stroke="#60a5fa" strokeWidth="1.3" /><line x1="10" y1="13" x2="9" y2="17" stroke="#60a5fa" strokeWidth="1.3" /><line x1="13" y1="13" x2="12" y2="17" stroke="#60a5fa" strokeWidth="1.3" /></svg>;
   if (type === 'snow') return <svg {...attrs}><path d="M5.5 10 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.8)" /><circle cx="7" cy="15.5" r=".7" fill="#e0f2fe" /><circle cx="10" cy="16.5" r=".7" fill="#e0f2fe" /><circle cx="13" cy="15.5" r=".7" fill="#e0f2fe" /></svg>;
   if (type === 'storm') return <svg {...attrs}><path d="M5.5 10 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.75)" /><path d="M10 12 L8 16 L10.5 16 L9 19" fill="#fbbf24" stroke="#fbbf24" /></svg>;
@@ -552,8 +582,8 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
     <section
       className={`risk-card glass ${expanded ? 'expanded' : ''}`}
       style={{
-        background: `linear-gradient(135deg, rgba(255,255,255,0.04), ${color}15)`,
-        borderColor: `${color}30`,
+        background: `linear-gradient(135deg, rgba(15, 25, 40, 0.32), ${color}24)`,
+        borderColor: `${color}65`,
       }}
     >
       <button className="risk-card-head" onClick={onToggle} aria-expanded={expanded}>
@@ -865,7 +895,12 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 // ════════════════════════════════════════════════════════════════════════════
 /*export_default*/ export default function App() {
   const sortedMunros = useMemo(() => [...MUNROS].sort((a, b) => b.h - a.h), []);
-  const [munro, setMunro] = useState(sortedMunros[0]);
+  const [munro, setMunro] = useState(() => {
+    // Pick a random Munro on first mount so each refresh is a small
+    // surprise. Stable for the rest of the session because useState's
+    // initialiser only runs once.
+    return sortedMunros[Math.floor(Math.random() * sortedMunros.length)];
+  });
   const [wx, setWx] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedMode, setSelectedMode] = useState('current');
@@ -1091,7 +1126,8 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
       )}
 
       <main className="content">
-        {/* SEARCH + REGION FILTERS */}
+        {/* SEARCH — region filter has moved to the All 282 Peaks page,
+            keeping the home page focused on the active forecast. */}
         <div className="home-search">
           <div className="search-row">
             <input
@@ -1111,26 +1147,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
                   <span className="search-meta">{m.h}m · {m.region}</span>
                 </button>
               ))}
-            </div>
-          )}
-          <div className="region-chips">
-            <button className={`chip ${!regionFilter ? 'active' : ''}`} onClick={() => setRegionFilter(null)}>All</button>
-            {REGIONS.slice(0, 8).map(r => (
-              <button key={r} className={`chip ${regionFilter === r ? 'active' : ''}`}
-                onClick={() => setRegionFilter(regionFilter === r ? null : r)}>{r}</button>
-            ))}
-          </div>
-          {regionFilter && (
-            <div className="region-filter-results">
-              <span>{filteredMunros.length} peaks in {regionFilter}</span>
-              <div className="region-chip-list">
-                {filteredMunros.slice(0, 6).map(m => (
-                  <button key={m.name} className={`region-peak-chip ${m.name === munro.name ? 'active' : ''}`}
-                    onClick={() => setMunro(m)}>
-                    {m.name} <span>{m.h}m</span>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </div>
@@ -1168,7 +1184,7 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
                     className={`hourly-cell glass ${active ? 'active' : ''} ${isCurrent ? 'current' : ''}`}
                     onClick={() => { setSelectedMode('hour'); setSelectedIndex(i); }}>
                     <div className="hourly-time">{h.label}</div>
-                    <div className="hourly-icon"><WeatherIcon type={h.type} size={20} /></div>
+                    <div className="hourly-icon"><WeatherIcon type={h.type} size={20} night={h.hour < 6 || h.hour >= 20} /></div>
                     <div className="hourly-temp">{displayTemp(h.temp)}°</div>
                     <div className="hourly-risk-dot" style={{ background: h.risk.riskColor, boxShadow: `0 0 6px ${h.risk.riskColor}` }} />
                   </button>
@@ -1313,8 +1329,7 @@ function PeaksPage({ munros, currentMunro, regions, onSelect, onClose }) {
         <input className="peaks-search"
           placeholder="Search peaks or region..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          autoFocus />
+          onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <div className="peaks-chips">

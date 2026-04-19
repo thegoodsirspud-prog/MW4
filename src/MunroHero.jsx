@@ -263,21 +263,48 @@ export default function MunroHero({
           </dl>
         </div>
 
-        {/* Ring gauges sit below the main bottom row, aligned right, so they
-            share horizontal rhythm with the stat stack above them. */}
+        {/* Ring trio sits below the main bottom row, aligned right, so they
+            share horizontal rhythm with the stat stack above them.
+            Wind shows direction inside the ring; Ascent shows the band
+            number (1-5); Midge shows the level (1-5). */}
         <div className="mhero-rings">
+          <Ring
+            label="Wind"
+            value={`${view.wind} mph`}
+            percent={Math.min(100, view.wind * 2.5)}
+            color={windRingColor(view.wind)}
+            inner={(
+              <svg
+                className="mhero-ring-arrow"
+                viewBox="0 0 12 12"
+                width="14" height="14"
+                style={{ transform: `rotate(${view.bearing || 0}deg)` }}
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 1.5 L9 7 L6.8 7 L6.8 10.5 L5.2 10.5 L5.2 7 L3 7 Z"
+                  fill={windRingColor(view.wind)}
+                  stroke="rgba(15, 25, 40, 0.7)"
+                  strokeWidth="0.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          />
           <Ring
             label="Ascent"
             value={toTitleCase(RISK_LABELS[view.risk.band])}
             percent={(view.risk.band + 1) * 20}
             color={view.risk.riskColor}
+            inner={<span className="mhero-ring-num">{view.risk.band + 1}</span>}
           />
           {midge && (
             <Ring
               label="Midge"
               value={midge.label}
               percent={Math.max(20, (midge.level || 1) * 20)}
-              color={midge.color || '#38bdf8'}
+              color={midge.color || '#94a3b8'}
+              inner={<span className="mhero-ring-num">{midge.level || 1}</span>}
             />
           )}
         </div>
@@ -289,42 +316,62 @@ export default function MunroHero({
 }
 
 /**
- * Ring — compact radial severity gauge used in the hero.
- * Same visual language for Ascent and Midge: a 40px stroked circle with
- * an animated arc whose length represents the severity, a coloured dot in
- * the centre, and the value + label beside it.
+ * windRingColor — five-band colour mapping for the wind ring arc, matching
+ * the wind map's legend so the visual language is consistent across the app.
  */
-function Ring({ label, value, percent, color }) {
+function windRingColor(mph) {
+  if (mph < 10) return '#22c55e';
+  if (mph < 20) return '#84cc16';
+  if (mph < 30) return '#eab308';
+  if (mph < 40) return '#f97316';
+  return '#ef4444';
+}
+
+/**
+ * Ring — compact radial severity gauge used in the hero.
+ * Identical visual language across Wind, Ascent, and Midge — a 40px
+ * stroked circle with an animated arc whose length represents the
+ * severity, content rendered inside the ring (number or arrow), and
+ * the value + label beside it.
+ *
+ * Props:
+ *   label  — small uppercase label beside the ring
+ *   value  — value rendered beside the ring (e.g. "Moderate" / "12 SW")
+ *   percent — 0-100, drives the arc length
+ *   color  — arc + content tint
+ *   inner  — optional ReactNode rendered INSIDE the ring (number, arrow)
+ *            falls back to a small white dot if not provided
+ */
+function Ring({ label, value, percent, color, inner }) {
   // Geometry: r=15 → circumference ≈ 94.25. Arc length = circumference * pct.
   const r = 15;
   const c = 2 * Math.PI * r;
   const dash = c * Math.max(0, Math.min(1, percent / 100));
   return (
     <div className="mhero-ring">
-      <svg className="mhero-ring-svg" viewBox="0 0 40 40" aria-hidden="true">
-        {/* Track — darker than before so the ring has presence on the bright
-            sky. Sits behind the coloured arc. */}
-        <circle
-          cx="20" cy="20" r={r}
-          fill="none"
-          stroke="rgba(15, 25, 40, 0.45)"
-          strokeWidth="3.5"
-        />
-        {/* Progress arc — starts at 12 o'clock, clockwise */}
-        <circle
-          cx="20" cy="20" r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="3.5"
-          strokeDasharray={`${dash} ${c}`}
-          strokeLinecap="round"
-          transform="rotate(-90 20 20)"
-          style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(.16,1,.3,1)' }}
-        />
-        {/* Inner dot — always crisp white regardless of ring colour, so it
-            reads on any sky. Arc and track carry the colour, not the dot. */}
-        <circle cx="20" cy="20" r="3" fill="#ffffff" />
-      </svg>
+      <div className="mhero-ring-stack">
+        <svg className="mhero-ring-svg" viewBox="0 0 40 40" aria-hidden="true">
+          <circle
+            cx="20" cy="20" r={r}
+            fill="none"
+            stroke="rgba(15, 25, 40, 0.45)"
+            strokeWidth="3.5"
+          />
+          <circle
+            cx="20" cy="20" r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth="3.5"
+            strokeDasharray={`${dash} ${c}`}
+            strokeLinecap="round"
+            transform="rotate(-90 20 20)"
+            style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(.16,1,.3,1)' }}
+          />
+        </svg>
+        <div className="mhero-ring-inner">
+          {inner ?? <div className="mhero-ring-dot" />}
+        </div>
+      </div>
       <div className="mhero-ring-text">
         <div className="mhero-ring-label">{label}</div>
         <div className="mhero-ring-value">{value}</div>
