@@ -2,6 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MUNROS } from './munros.js';
+import { RISK_COLORS } from './risk.js';
+
+/**
+ * Elevation-to-risk proxy. Without fetching all 282 forecasts we use
+ * height as a stand-in for exposure risk — higher summits genuinely ARE
+ * colder, windier, and more exposed, so this is physically defensible
+ * rather than arbitrary. Thresholds are the 20/40/60/80 quintiles of
+ * the real 282-peak distribution (909m min, 1345m max).
+ *
+ * When the user picks a peak and we have the real forecast, the
+ * app-level riskByName overrides this proxy for that peak.
+ */
+function heightRiskColor(h) {
+  if (h < 945) return RISK_COLORS[0];  // green — lowest quintile
+  if (h < 981) return RISK_COLORS[1];  // yellow
+  if (h < 1019) return RISK_COLORS[2]; // orange
+  if (h < 1084) return RISK_COLORS[3]; // red
+  return RISK_COLORS[4];               // deep red — top quintile (>= 1084m)
+}
 
 /**
  * MunroTileMap
@@ -32,10 +51,14 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
+  // Tap-preview — first tap on a peak shows this floating card, the user
+  // can confirm by tapping "View forecast" or tap elsewhere to dismiss.
+  const [preview, setPreview] = useState(null);
 
   // Build GeoJSON once per riskByName change. Each feature carries the
   // peak's name, region, elevation, and risk colour so the GL style can
-  // paint it without React rerenders.
+  // paint it without React rerenders. Default colour uses the elevation
+  // proxy; real forecast data (if available via riskByName) overrides.
   const featureCollection = {
     type: 'FeatureCollection',
     features: MUNROS.map((m) => ({
@@ -45,7 +68,7 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         name: m.name,
         region: m.region,
         h: m.h,
-        color: riskByName[m.name] || '#60a5fa',
+        color: riskByName[m.name] || heightRiskColor(m.h),
       },
     })),
   };
@@ -169,12 +192,27 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         },
       });
 
-      // Click-to-select
+      // Tap a peak → open the preview card. User confirms via the card's
+      // "View forecast" button rather than committing on first tap, which
+      // prevents accidental navigation and lets them verify which peak
+      // they actually hit (Munros are densely packed in the Cairngorms).
       map.on('click', 'munros-dot', (e) => {
         const name = e.features?.[0]?.properties?.name;
         if (!name) return;
         const munro = MUNROS.find((m) => m.name === name);
-        if (munro) onSelectMunro(munro);
+        if (!munro) return;
+        // Gently nudge the peak into view if it's near the edge
+        map.easeTo({
+          center: [munro.lon, munro.lat],
+          duration: 400,
+        });
+        setPreview(munro);
+      });
+
+      // Tap anywhere else on the map — dismiss the preview
+      map.on('click', (e) => {
+        const hits = map.queryRenderedFeatures(e.point, { layers: ['munros-dot'] });
+        if (hits.length === 0) setPreview(null);
       });
 
       map.on('mouseenter', 'munros-dot', () => {
@@ -221,6 +259,18 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
     }
   }, [ready, selectedMunro]);
 
+  // Reset to full-Scotland view
+  const resetView = () => {
+    if (!mapRef.current) return;
+    setPreview(null);
+    mapRef.current.flyTo({
+      center: [-4.2, 57.0],
+      zoom: 6.2,
+      duration: 700,
+      essential: true,
+    });
+  };
+
   return (
     <div className="map-overlay">
       <div className="map-header">
@@ -232,7 +282,44 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
       </div>
-      <div ref={containerRef} className="tile-map-viewport" />
+      <div ref={containerRef} className="tile-map-viewport">
+        <button
+          className="tile-map-reset"
+          onClick={resetView}
+          aria-label="Reset view to full Scotland"
+          title="Reset view"
+        >
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path
+              d="M10 3 L10 7 M3 10 L7 10 M10 13 L10 17 M13 10 L17 10"
+              stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+            />
+            <circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          </svg>
+        </button>
+
+        {preview && (
+          <div className="tile-map-preview" role="dialog" aria-label={`Preview of ${preview.name}`}>
+            <div className="tile-map-preview-eyebrow">{preview.region}</div>
+            <div className="tile-map-preview-name">{preview.name}</div>
+            <div className="tile-map-preview-meta">
+              <span>{preview.h.toLocaleString()}m</span>
+              <span className="tile-map-preview-sep" aria-hidden="true">·</span>
+              <span>Munro</span>
+            </div>
+            <div className="tile-map-preview-actions">
+              <button
+                className="tile-map-preview-cancel"
+                onClick={() => setPreview(null)}
+              >Close</button>
+              <button
+                className="tile-map-preview-confirm"
+                onClick={() => { const p = preview; setPreview(null); onSelectMunro(p); }}
+              >View forecast →</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -349,6 +349,13 @@ function buildHourlyViews(wx) {
     const risk = calcRisk(syntheticWx);
     const hour = new Date(h.time[i]).getHours();
 
+    // Find the matching day's sunrise/sunset so the hero's pill keeps
+    // showing times when the user previews a specific hour.
+    const dayStr = h.time[i].slice(0, 10);
+    const dayIdx = wx?.daily?.time?.findIndex((t) => t.startsWith(dayStr)) ?? -1;
+    const sunrise = dayIdx >= 0 ? wx.daily.sunrise?.[dayIdx] : null;
+    const sunset = dayIdx >= 0 ? wx.daily.sunset?.[dayIdx] : null;
+
     hrs.push({
       viewKey: `hour-${i}`,
       label: i === start ? 'Now' : formatHour(h.time[i]),
@@ -368,6 +375,7 @@ function buildHourlyViews(wx) {
       rawTemp: h.temperature_2m[i], rawWind: h.wind_speed_10m[i], rawHumidity: h.relative_humidity_2m[i],
       rawHour: hour,
       isNow: i === start,
+      sunrise, sunset,
     });
   }
 
@@ -428,6 +436,9 @@ function RiskHub({ activeView, midge, unitF }) {
           <div className="overall-score" style={{ color: overall.riskColor }}>{overall.score}<span>/100</span></div>
         </div>
         <div className="overall-headline">{overall.headline}</div>
+        <div className="overall-context">
+          {activeView.cond} · {activeView.wind} mph {activeView.windDirLabel} · Feels {unitF ? Math.round((activeView.feels * 9) / 5 + 32) : activeView.feels}°{unitF ? 'F' : 'C'}
+        </div>
         <div className="overall-bar-track">
           <div
             className="overall-bar-fill"
@@ -1041,8 +1052,8 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
             <button className="menu-item" onClick={() => navTo('map')}>
               <div className="menu-icon">🗺️</div>
               <div>
-                <div className="menu-item-title">Map of Scotland</div>
-                <div className="menu-item-sub">Interactive topographic map</div>
+                <div className="menu-item-title">Munro Map</div>
+                <div className="menu-item-sub">All 282 peaks on Scotland</div>
               </div>
             </button>
             <button className="menu-item" onClick={() => navTo('wind')}>
