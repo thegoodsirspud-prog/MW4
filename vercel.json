@@ -2,9 +2,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "framework": "vite",
-  "projectSettings": {
-    "rootDirectory": null,
-    "nodeVersion": "18.x"
-  }
+  "framework": "vite"
 }

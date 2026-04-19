@@ -756,7 +756,7 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 // ════════════════════════════════════════════════════════════════════════════
 // Main App
 // ════════════════════════════════════════════════════════════════════════════
-/*export_default*/ function App() {
+/*export_default*/ export default function App() {
   const sortedMunros = useMemo(() => [...MUNROS].sort((a, b) => b.h - a.h), []);
   const [munro, setMunro] = useState(sortedMunros[0]);
   const [wx, setWx] = useState(null);
