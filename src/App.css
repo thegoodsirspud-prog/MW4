@@ -189,13 +189,19 @@ button { font-family: inherit; }
 }
 .mountains svg { width: 100%; display: block; }
 
-/* ─── 6. Glass surface ────────────────────────────────────────────────── */
+/* ─── 6. Glass surface ──────────────────────────────────────────────────
+   On the brighter sky palette, a light-white tint (rgba(255,255,255,0.07))
+   reads as "almost invisible". A dark-translucent surface gives proper
+   contrast for the white text while preserving the blurred sky behind.
+   This is the same trick Apple Weather uses — its "glass" is actually a
+   dark translucent layer, not a light one. */
 .glass {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(15, 25, 40, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 16px;
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.15);
 }
 
 /* ─── 7. Hamburger menu ───────────────────────────────────────────────── */
@@ -448,34 +454,35 @@ button { font-family: inherit; }
 }
 .overall-label {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 2px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.88);
   text-transform: uppercase;
 }
 .overall-score {
   font-size: 32px;
-  font-weight: 200;
+  font-weight: 300;
   letter-spacing: -1.5px;
   line-height: 1;
 }
 .overall-score span {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
-  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
   margin-left: 4px;
   letter-spacing: -0.3px;
 }
 .overall-headline {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   margin-bottom: 14px;
   letter-spacing: -0.1px;
+  color: #ffffff;
 }
 .overall-bar-track {
   position: relative;
   height: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 3px;
   overflow: visible;
 }
@@ -499,11 +506,11 @@ button { font-family: inherit; }
   margin-top: 10px;
   font-size: 9px; font-weight: 600;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.6);
 }
 .overall-band.active {
   color: #fff;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 /* ─── 11. Expandable risk cards ───────────────────────────────────────── */
@@ -521,7 +528,7 @@ button { font-family: inherit; }
   transition: background 0.15s ease;
   border-radius: 16px;
 }
-.risk-card-head:hover { background: rgba(255, 255, 255, 0.04); }
+.risk-card-head:hover { background: rgba(255, 255, 255, 0.08); }
 
 .gauge {
   flex-shrink: 0;
@@ -537,8 +544,9 @@ button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.3px;
+  color: #ffffff;
 }
 
 .risk-card-info {
@@ -547,25 +555,26 @@ button { font-family: inherit; }
 }
 .risk-card-eyebrow {
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1.5px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.85);
   text-transform: uppercase;
 }
 .risk-card-title {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.1px;
+  color: #ffffff;
 }
 .risk-card-desc {
   font-size: 11px;
-  color: rgba(245, 245, 247, 0.62);
+  color: rgba(255, 255, 255, 0.78);
   line-height: 1.4;
   margin-top: 1px;
 }
 .risk-card-chevron {
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.75);
   transition: transform 0.3s ease;
 }
 .risk-card-chevron.rotated { transform: rotate(180deg); }
@@ -582,9 +591,9 @@ button { font-family: inherit; }
 /* Factor rows */
 .factor-eyebrow {
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1.8px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.8);
   text-transform: uppercase;
   margin-bottom: 14px;
 }
@@ -596,18 +605,19 @@ button { font-family: inherit; }
 }
 .factor-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
-  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
   flex-shrink: 0;
 }
 .factor-value {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
   text-align: right;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 .factor-score {
   margin-left: 6px;
@@ -678,17 +688,21 @@ button { font-family: inherit; }
   color: inherit;
   transition: background 0.2s ease, transform 0.15s ease;
 }
-.strip-cell:hover { background: rgba(255, 255, 255, 0.06); }
+.strip-cell:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
 .strip-cell:active { transform: scale(0.96); }
 .strip-cell.active {
-  background: rgba(96, 165, 250, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.45);
+  background: rgba(96, 165, 250, 0.3);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(130, 180, 255, 0.85),
+    0 0 20px rgba(96, 165, 250, 0.3);
 }
 .strip-day {
   font-size: 10.5px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.8px;
-  color: rgba(245, 245, 247, 0.7);
+  color: rgba(255, 255, 255, 0.88);
   text-transform: uppercase;
 }
 .strip-cell.active .strip-day { color: #fff; }
@@ -741,30 +755,33 @@ button { font-family: inherit; }
   padding: 10px 4px 8px;
   scroll-snap-align: start;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(15, 25, 40, 0.25) !important;
   color: inherit;
   transition: all 0.2s ease;
   position: relative;
 }
 .hourly-cell:hover {
-  background: rgba(255, 255, 255, 0.11) !important;
+  background: rgba(15, 25, 40, 0.38) !important;
   border-color: rgba(255, 255, 255, 0.32) !important;
 }
 .hourly-cell:active { transform: scale(0.95); }
 .hourly-cell.current {
-  background: rgba(255, 255, 255, 0.16) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(15, 25, 40, 0.48) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .hourly-cell.active {
-  background: rgba(96, 165, 250, 0.22) !important;
-  border-color: rgba(96, 165, 250, 0.5) !important;
-  box-shadow: 0 0 20px rgba(96, 165, 250, 0.2);
+  background: rgba(96, 165, 250, 0.32) !important;
+  border-color: rgba(130, 180, 255, 0.85) !important;
+  box-shadow:
+    0 0 0 1px rgba(130, 180, 255, 0.45),
+    0 0 24px rgba(96, 165, 250, 0.35);
 }
 .hourly-time {
   font-size: 10px;
   letter-spacing: 0.3px;
-  color: rgba(245, 245, 247, 0.7);
-  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 600;
 }
 .hourly-cell.current .hourly-time,
 .hourly-cell.active .hourly-time { color: #fff; }
@@ -795,30 +812,32 @@ button { font-family: inherit; }
 .metric-head {
   display: flex; align-items: center; gap: 6px;
   font-size: 10.5px;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 1.5px;
-  color: rgba(245, 245, 247, 0.55);
+  color: rgba(255, 255, 255, 0.88);
   text-transform: uppercase;
   margin-bottom: 10px;
 }
 .metric-value {
   font-size: 26px;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: -0.8px;
   line-height: 1;
+  color: #ffffff;
 }
 .metric-value small {
   font-size: 13px;
-  font-weight: 400;
-  color: rgba(245, 245, 247, 0.55);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
   margin-left: 3px;
   letter-spacing: -0.2px;
 }
 .metric-sub {
   font-size: 11px;
-  color: rgba(245, 245, 247, 0.55);
+  color: rgba(255, 255, 255, 0.78);
   margin-top: 6px;
   letter-spacing: 0.05px;
+  font-weight: 500;
 }
 .wind-widget {
   grid-column: span 2;
@@ -830,21 +849,23 @@ button { font-family: inherit; }
 .wind-info { flex: 1; min-width: 0; }
 .wind-primary {
   font-size: 22px;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: -0.8px;
   margin-bottom: 3px;
+  color: #ffffff;
 }
 .wind-primary small {
   font-size: 13px;
-  font-weight: 400;
-  color: rgba(245, 245, 247, 0.55);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
   margin-left: 6px;
   letter-spacing: -0.2px;
 }
 .wind-gust {
   font-size: 12px;
-  color: rgba(245, 245, 247, 0.6);
+  color: rgba(255, 255, 255, 0.78);
   margin-bottom: 10px;
+  font-weight: 500;
 }
 .wind-bar {
   height: 3px;
@@ -863,8 +884,8 @@ button { font-family: inherit; }
 .alert {
   margin-top: 24px;
   padding: 14px 16px;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(245, 158, 11, 0.08));
-  border: 0.5px solid rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(245, 158, 11, 0.12));
+  border: 1px solid rgba(239, 68, 68, 0.5);
   border-radius: 16px;
   display: flex; gap: 12px;
   align-items: flex-start;
@@ -882,8 +903,8 @@ button { font-family: inherit; }
 .alert-body { flex: 1; }
 .alert-title {
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 1px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
   color: #fca5a5;
   margin-bottom: 3px;
   text-transform: uppercase;
@@ -891,7 +912,7 @@ button { font-family: inherit; }
 .alert-text {
   font-size: 13px;
   line-height: 1.45;
-  color: rgba(245, 245, 247, 0.85);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 /* ─── 16. 7-day outlook grid ──────────────────────────────────────────── */
@@ -962,7 +983,7 @@ button { font-family: inherit; }
   text-align: center;
   padding: 30px 0 12px;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.55);
   letter-spacing: 0.3px;
   line-height: 1.6;
 }
