@@ -98,6 +98,71 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 
+/* ── Time-of-day overlay ───────────────────────────────────────────
+   A second absolutely-positioned layer composited on top of the sky
+   gradient. Uses mix-blend-mode so we modulate brightness/tint rather
+   than replace colour. Combines with any .sky-<weather> class. */
+.sky::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: transparent;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: background 1.4s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Night 22:00–04:00 — heavy deep-navy multiply turns any daytime sky
+   into a believable night sky. Multiply means midday gradients → navy,
+   but already-dark storm skies stay close to what they were. */
+.app.time-night .sky::before {
+  background: linear-gradient(180deg,
+    rgba(12, 20, 38, 0.88) 0%,
+    rgba(20, 30, 55, 0.78) 50%,
+    rgba(30, 42, 70, 0.68) 100%);
+}
+
+/* Dawn 04:00–06:00 — warm purple-pink horizon band */
+.app.time-dawn .sky::before {
+  background: linear-gradient(180deg,
+    rgba(40, 40, 70, 0.55) 0%,
+    rgba(100, 60, 80, 0.35) 55%,
+    rgba(180, 120, 110, 0.25) 85%,
+    rgba(200, 140, 120, 0.15) 100%);
+}
+
+/* Golden hour 06:00–08:00 and 18:00–20:00 — warm amber overlay */
+.app.time-golden .sky::before {
+  background: linear-gradient(180deg,
+    rgba(100, 90, 120, 0.25) 0%,
+    rgba(180, 140, 120, 0.28) 60%,
+    rgba(220, 170, 130, 0.22) 100%);
+}
+
+/* Morning 08:00–11:00 — slight cool lift, essentially neutral */
+.app.time-morning .sky::before { background: transparent; }
+
+/* Midday 11:00–17:00 — full brightness, no overlay */
+.app.time-midday .sky::before { background: transparent; }
+
+/* Evening 17:00–18:00 — slight warm tint */
+.app.time-evening .sky::before {
+  background: linear-gradient(180deg,
+    rgba(80, 75, 105, 0.18) 0%,
+    rgba(160, 130, 120, 0.20) 70%,
+    rgba(190, 150, 130, 0.15) 100%);
+}
+
+/* Dusk 20:00–22:00 — mauve into deep blue */
+.app.time-dusk .sky::before {
+  background: linear-gradient(180deg,
+    rgba(25, 30, 55, 0.65) 0%,
+    rgba(60, 50, 85, 0.55) 55%,
+    rgba(110, 80, 100, 0.40) 90%,
+    rgba(130, 90, 100, 0.30) 100%);
+}
+
 /* ─── 4. Weather FX ─────────────────────────────────────────────────────
    Ambient atmospheric layers only — following Apple Weather / BBC Weather
    restraint. No flashy effects, no visible wind streaks, no competing
@@ -1263,10 +1328,10 @@ button { font-family: inherit; }
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* ── Wind field — animated WebGL particle layer ──────────────────────
-   Replaces the old DOM-arrow approach. The map renders particles via
-   a CustomLayer; React only needs the surrounding chrome (header,
-   legend, progress chip). */
+/* ── Wind map — static symbol layer arrows ───────────────────────────
+   Single GPU draw call for all 30 arrows; no per-frame work. Legend
+   shows 5-band palette matching risk colours. Tap an arrow → popup
+   with location detail. */
 
 .wind-field-legend {
   position: absolute;
@@ -1280,37 +1345,120 @@ button { font-family: inherit; }
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.45);
-  min-width: 130px;
 }
 .wind-field-legend-title {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 1.6px;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.9);
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
-.wind-field-legend-bar {
-  height: 5px;
-  border-radius: 3px;
-  background: linear-gradient(90deg,
-    rgba(102, 217, 255, 0.4) 0%,
-    rgba(102, 217, 255, 1.0) 35%,
-    rgba(255, 255, 255, 1.0) 100%);
-  margin-bottom: 5px;
-  box-shadow: 0 0 8px rgba(102, 217, 255, 0.4);
-}
-.wind-field-legend-row {
+.wind-legend-row {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.82);
   display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
-  letter-spacing: 0.5px;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-variant-numeric: tabular-nums;
+}
+.wind-legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
 }
 
-/* Loading-state chip — shown only while the 192-grid fetch is running.
-   Replaced by the live particles once data lands. */
+/* Wind detail popup — shown when an arrow is tapped */
+.wind-popup {
+  position: absolute;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(300px, calc(100% - 32px));
+  padding: 14px 14px 12px;
+  background: rgba(15, 25, 40, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow:
+    0 10px 30px -6px rgba(0, 0, 0, 0.5),
+    0 4px 10px -2px rgba(0, 0, 0, 0.3);
+  animation: wind-popup-in 0.25s cubic-bezier(.16, 1, .3, 1);
+}
+@keyframes wind-popup-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.wind-popup-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.wind-popup-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 3px;
+}
+.wind-popup-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+.wind-popup-close {
+  background: transparent; border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px; cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: inherit;
+}
+.wind-popup-close:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.wind-popup-body {
+  display: flex; align-items: baseline; gap: 14px;
+}
+.wind-popup-speed {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -1.2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wind-popup-speed span {
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 5px;
+  letter-spacing: 0.2px;
+  opacity: 0.8;
+}
+.wind-popup-detail {
+  display: flex; flex-direction: column;
+  gap: 2px;
+}
+.wind-popup-label-line {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+}
+.wind-popup-gust {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* Loading-state chip — shown while the 30-point fetch is running. */
 .wind-progress-chip {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);

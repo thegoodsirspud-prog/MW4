@@ -957,6 +957,21 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
   }, [activeView]);
 
   const skyType = activeView?.type || 'cloudy';
+
+  // Time-of-day band drives the sky overlay. Uses the active view's hour
+  // if we're previewing a forecast hour, otherwise the current wall-clock
+  // hour. Result: preview tomorrow 3am → sky goes night; now at 2pm → midday.
+  const timeBand = (() => {
+    const h = activeView?.rawHour ?? activeView?.hour ?? new Date().getHours();
+    if (h >= 22 || h < 4)  return 'night';
+    if (h < 6)             return 'dawn';
+    if (h < 8)             return 'golden';
+    if (h < 11)            return 'morning';
+    if (h < 17)            return 'midday';
+    if (h < 18)            return 'evening';
+    if (h < 20)            return 'golden';
+    return 'dusk';
+  })();
   const fxRef = useWeatherFx(skyType);
 
   const filteredMunros = useMemo(() => {
@@ -1064,7 +1079,7 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 
   // ────── Main home page
   return (
-    <div className={`app sky-${skyType}`}>
+    <div className={`app sky-${skyType} time-${timeBand}`}>
       <div className="sky" />
       <div className="fx" ref={fxRef} />
 
