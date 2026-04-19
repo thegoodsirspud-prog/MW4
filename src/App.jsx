@@ -1074,29 +1074,7 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
         {/* RISK HUB — Overall + Mountain + Midge */}
         <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} />
 
-        {/* 7-DAY STRIP */}
-        <nav className="forecast-strip glass" aria-label="7-day forecast">
-          {dailyViews.slice(0, 7).map((day, i) => {
-            const active = (selectedMode === 'day' && selectedIndex === i) ||
-                           (selectedMode === 'current' && i === 0);
-            return (
-              <button key={day.viewKey}
-                className={`strip-cell ${active ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedMode(i === 0 ? 'current' : 'day');
-                  setSelectedIndex(i);
-                }}
-                aria-pressed={active}>
-                <div className="strip-risk-dot" style={{ background: day.risk.riskColor, boxShadow: `0 0 6px ${day.risk.riskColor}` }} />
-                <div className="strip-day">{day.label}</div>
-                <div className="strip-icon"><WeatherIcon type={day.type} size={22} /></div>
-                <div className="strip-temp">{displayTemp(day.temp)}°</div>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* HOURLY — clickable */}
+        {/* HOURLY — clickable (placed above daily for tap-to-preview-first flow) */}
         {hourlyViews.length > 0 && (
           <section className="section">
             <div className="section-title"><span>Hourly · tap to preview</span></div>
@@ -1119,6 +1097,28 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           </section>
         )}
 
+        {/* 7-DAY STRIP */}
+        <nav className="forecast-strip glass" aria-label="7-day forecast">
+          {dailyViews.slice(0, 7).map((day, i) => {
+            const active = (selectedMode === 'day' && selectedIndex === i) ||
+                           (selectedMode === 'current' && i === 0);
+            return (
+              <button key={day.viewKey}
+                className={`strip-cell ${active ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedMode(i === 0 ? 'current' : 'day');
+                  setSelectedIndex(i);
+                }}
+                aria-pressed={active}>
+                <div className="strip-risk-dot" style={{ background: day.risk.riskColor, boxShadow: `0 0 6px ${day.risk.riskColor}` }} />
+                <div className="strip-day">{day.label}</div>
+                <div className="strip-icon"><WeatherIcon type={day.type} size={22} /></div>
+                <div className="strip-temp">{displayTemp(day.temp)}°</div>
+              </button>
+            );
+          })}
+        </nav>
+
 
         {/* ALERT for elevated risk */}
         {activeView.risk.band >= 2 && (
@@ -1133,35 +1133,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
             </div>
           </div>
         )}
-
-        {/* 7-DAY OUTLOOK */}
-        <section className="section">
-          <div className="section-title"><span>7-day outlook</span></div>
-          <div className="outlook-grid">
-            {dailyViews.map((d, i) => {
-              const active = (selectedMode === 'day' && selectedIndex === i) ||
-                             (selectedMode === 'current' && i === 0);
-              return (
-                <button key={d.viewKey}
-                  className={`outlook-cell glass ${active ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedMode(i === 0 ? 'current' : 'day');
-                    setSelectedIndex(i);
-                  }}>
-                  <div className="outlook-day">{d.label}</div>
-                  <div className="outlook-icon"><WeatherIcon type={d.type} size={28} /></div>
-                  <div className="outlook-temps">
-                    {displayTemp(d.temp)}° <span>/ {displayTemp(d.tempMin)}°</span>
-                  </div>
-                  <div className="outlook-risk-badge-solid"
-                    style={{ background: d.risk.riskColor }}>
-                    {RISK_LABELS[d.risk.band]}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
 
         <footer className="app-footer">
           Summit weather: Open-Meteo · Risk: MWIS methodology · Midge: APS Biocontrol research

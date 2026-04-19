@@ -27,7 +27,7 @@
  */
 
 export const MIDGE_LABELS = ['', 'Very Low', 'Low', 'Moderate', 'High', 'Severe'];
-export const MIDGE_COLORS = ['', '#22c55e', '#84cc16', '#eab308', '#f97316', '#dc2626'];
+export const MIDGE_COLORS = ['', '#06b6d4', '#0891b2', '#a855f7', '#7c3aed', '#5b21b6'];
 export const MIDGE_DESCRIPTIONS = [
   '',
   'Minimal midge activity expected',

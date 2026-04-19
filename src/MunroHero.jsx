@@ -239,9 +239,10 @@ export default function MunroHero({
           </div>
           <button className="mhero-peak" onClick={onPickPeak} aria-label="Change peak">
             <span className="mhero-peak-name">{munro.name}</span>
-            <span className="mhero-peak-sub">
-              {munro.region} · {munro.h.toLocaleString()}m
-            </span>
+            <span className="mhero-peak-sep">·</span>
+            <span className="mhero-peak-sub">{munro.region}</span>
+            <span className="mhero-peak-sep">·</span>
+            <span className="mhero-peak-sub">{munro.h.toLocaleString()}m</span>
             <svg className="mhero-peak-chev" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
               <path d="M3 5 L6 8 L9 5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
