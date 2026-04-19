@@ -1106,26 +1106,73 @@ button { font-family: inherit; }
   background: rgba(10, 13, 20, 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   z-index: 2;
 }
 .map-title .map-eyebrow {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: rgba(255, 255, 255, 0.85);
   text-transform: uppercase;
 }
 .map-title .map-subtitle {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   margin-top: 2px;
+  color: #ffffff;
 }
 .map-viewport {
   flex: 1;
   overflow: hidden;
   position: relative;
   touch-action: none;
+}
+
+/* ── Real-map (MapLibre GL) viewport ────────────────────────────────
+   Full-area canvas below the header. MapLibre renders directly into
+   this div; we only need to give it dimensions and guard against overflow. */
+.tile-map-viewport {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.tile-map-viewport .maplibregl-canvas {
+  outline: none;
+}
+/* Nudge MapLibre's default controls to fit the app's dark aesthetic */
+.tile-map-viewport .maplibregl-ctrl-top-right {
+  top: 12px;
+  right: 12px;
+}
+.tile-map-viewport .maplibregl-ctrl-group {
+  background: rgba(15, 25, 40, 0.82);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.tile-map-viewport .maplibregl-ctrl-group button {
+  background: transparent;
+  color: #ffffff;
+  filter: invert(1) brightness(1.4);
+}
+.tile-map-viewport .maplibregl-ctrl-group button + button {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.tile-map-viewport .maplibregl-ctrl-attrib {
+  background: rgba(15, 25, 40, 0.75);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin: 0 8px 8px 0;
+}
+.tile-map-viewport .maplibregl-ctrl-attrib a {
+  color: rgba(255, 255, 255, 0.85);
 }
 .map-controls {
   position: absolute;

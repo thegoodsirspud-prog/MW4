@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { MUNROS } from './munros.js';
 import { lookupWMO } from './weather-codes.js';
 import { fetchWeather } from './weather-api.js';
@@ -12,6 +12,9 @@ import {
   MAP_LABELS, MAJOR_LOCHS,
 } from './scotland-geo.js';
 import MunroHero from './MunroHero.jsx';
+// MunroTileMap pulls in MapLibre (~200KB gzipped) — code-split so the home
+// page stays tiny. Only users who open /map pay the download cost.
+const MunroTileMap = lazy(() => import('./MunroTileMap.jsx'));
 import './App.css';
 import './MunroHero.css';
 
@@ -916,12 +919,24 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 
   // ────── Map views
   if (page === 'map') {
-    return <ScotlandMap
-      onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
-      selectedMunro={munro}
-      onClose={() => setPage('home')}
-      mode="peaks"
-    />;
+    // Colour each peak by current risk where we have it. Without fetching
+    // all 282 peaks' forecasts, we colour the selected peak with its real
+    // risk and leave the rest with a consistent neutral accent blue. As
+    // the user taps around, the selected one reveals its true risk.
+    const riskByName = {};
+    if (activeView?.risk?.riskColor && munro?.name) {
+      riskByName[munro.name] = activeView.risk.riskColor;
+    }
+    return (
+      <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading map…</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close map">✕</button></div></div>}>
+        <MunroTileMap
+          onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
+          selectedMunro={munro}
+          onClose={() => setPage('home')}
+          riskByName={riskByName}
+        />
+      </Suspense>
+    );
   }
   if (page === 'wind') {
     return <ScotlandMap
