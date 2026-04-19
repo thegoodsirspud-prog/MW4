@@ -8,14 +8,12 @@
 
 .mhero {
   position: relative;
-  margin: 10px 0 28px;
-  overflow: hidden;
+  margin: 0 -22px 28px;  /* negative horizontal margin counters .content padding so hero bleeds full-width */
   min-height: 340px;
   isolation: isolate;
-  /* No card frame — the SVG sky fills the area, content sits on it directly.
-     We keep a subtle rounded clip so the sky gradient has soft edges rather
-     than hard page-bleed, but no border, background, or shadow. */
-  border-radius: 16px;
+  /* No card — hero is an integrated part of the page. The page's .sky
+     gradient shows through here; only the sun/moon and stars float on
+     the transparent SVG layer above it. */
 }
 
 /* ── The SVG scene sits behind content, fills the card ─────────────── */
@@ -37,7 +35,7 @@
 .mhero-content {
   position: relative;
   z-index: 2;
-  padding: 22px 22px 24px;
+  padding: 28px 22px 24px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -304,54 +302,58 @@
   letter-spacing: 0.4px;
 }
 
-/* Chip row under Ascent label holds both Ascent + Midge chips */
-.mhero-stat-chips dd {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
+/* ── Ring gauges — Ascent + Midge ────────────────────────────────────
+   Matched pair, identical typography and dimensions. Left: stroked 40px
+   progress ring with coloured arc + inner dot. Right: small uppercase
+   label + bold value. Scans in 300ms. */
+.mhero-rings {
+  display: flex;
+  gap: 20px;
   justify-content: flex-end;
-  white-space: normal;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.12);
 }
 
-/* ── Chips — compact pill with coloured dot + label ──────────────────
-   Visually ties to the card indicators elsewhere in the app. Background
-   is a gentle tint of the chip colour, so at-a-glance you see green/amber/
-   red for ascent and blues for midge, while the hero still reads clean. */
-.mhero-chip {
+.mhero-ring {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px 5px 8px;
-  border-radius: 100px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: #ffffff;
-  background: color-mix(in oklab, var(--chip-color) 24%, transparent);
-  border: 0.5px solid color-mix(in oklab, var(--chip-color) 55%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  white-space: nowrap;
+  gap: 10px;
 }
 
-.mhero-chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--chip-color);
-  box-shadow: 0 0 6px var(--chip-color);
+.mhero-ring-svg {
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 
-.mhero-chip-midge {
+.mhero-ring-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.mhero-ring-label {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: none;
-  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.mhero-ring-value {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ── Hour-preview banner when user is looking at a non-now hour ────── */
@@ -399,11 +401,13 @@
   .mhero-temp-unit        { font-size: 30px; margin-top: 12px; }
   .mhero-peak-name        { font-size: 22px; }
   .mhero-peak-meta        { font-size: 12px; gap: 6px; }
-  .mhero-content          { padding: 18px 18px 22px; min-height: 320px; }
+  .mhero-content          { padding: 22px 18px 22px; min-height: 320px; }
   .mhero-stats            { gap: 8px; max-width: 54%; }
   .mhero-stat dd          { font-size: 14px; }
   .mhero-stat-strong      { font-size: 15px; }
-  .mhero-chip             { font-size: 9.5px; padding: 4px 8px 4px 7px; }
+  .mhero-rings            { gap: 14px; margin-top: 14px; padding-top: 12px; }
+  .mhero-ring-svg         { width: 36px; height: 36px; }
+  .mhero-ring-value       { font-size: 13px; }
 }
 
 /* ── Respect reduced-motion ────────────────────────────────────────── */

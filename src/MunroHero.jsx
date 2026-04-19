@@ -86,9 +86,6 @@ export default function MunroHero({
   const pyCelestial = parallax.y * 3;
   const pxCelestial = parallax.x * 3;
 
-  // ─── Sky gradient — composite of time-of-day + weather ────────────────
-  const skyGradientId = `sky-${skyType}-${celestial.daytime ? 'day' : 'night'}`;
-
   return (
     <header
       className="mhero"
@@ -104,63 +101,6 @@ export default function MunroHero({
         aria-hidden="true"
       >
         <defs>
-          {/* Sky gradients per mood + time */}
-          <linearGradient id="sky-clear-day" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#1e3a62" />
-            <stop offset="40%" stopColor="#3b6ea5" />
-            <stop offset="75%" stopColor="#8fb4d4" />
-            <stop offset="100%" stopColor="#d4c7a8" />
-          </linearGradient>
-          <linearGradient id="sky-clear-night" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#0a0f1f" />
-            <stop offset="50%" stopColor="#1a2340" />
-            <stop offset="100%" stopColor="#3d4a6b" />
-          </linearGradient>
-          <linearGradient id="sky-cloudy-day" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#2a3340" />
-            <stop offset="50%" stopColor="#4a5360" />
-            <stop offset="100%" stopColor="#7a8290" />
-          </linearGradient>
-          <linearGradient id="sky-cloudy-night" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#101521" />
-            <stop offset="100%" stopColor="#2a3340" />
-          </linearGradient>
-          <linearGradient id="sky-rain-day" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#253040" />
-            <stop offset="60%" stopColor="#405060" />
-            <stop offset="100%" stopColor="#6a7682" />
-          </linearGradient>
-          <linearGradient id="sky-rain-night" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#0d1420" />
-            <stop offset="100%" stopColor="#283440" />
-          </linearGradient>
-          <linearGradient id="sky-storm-day" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#15202b" />
-            <stop offset="50%" stopColor="#28323e" />
-            <stop offset="100%" stopColor="#4a5562" />
-          </linearGradient>
-          <linearGradient id="sky-storm-night" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#080c14" />
-            <stop offset="100%" stopColor="#1e2732" />
-          </linearGradient>
-          <linearGradient id="sky-snow-day" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#3d4b5e" />
-            <stop offset="50%" stopColor="#6a7894" />
-            <stop offset="100%" stopColor="#9daac0" />
-          </linearGradient>
-          <linearGradient id="sky-snow-night" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#18202e" />
-            <stop offset="100%" stopColor="#384458" />
-          </linearGradient>
-          <linearGradient id="sky-fog-day" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#485260" />
-            <stop offset="100%" stopColor="#a5afbb" />
-          </linearGradient>
-          <linearGradient id="sky-fog-night" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%"  stopColor="#1a2028" />
-            <stop offset="100%" stopColor="#4a5460" />
-          </linearGradient>
-
           {/* Sun glow */}
           <radialGradient id="sun-glow">
             <stop offset="0%"  stopColor="rgba(255, 235, 180, 0.9)" />
@@ -172,22 +112,11 @@ export default function MunroHero({
             <stop offset="40%" stopColor="rgba(200, 215, 240, 0.15)" />
             <stop offset="100%" stopColor="rgba(180, 200, 230, 0)" />
           </radialGradient>
-
-          {/* Subtle grain overlay for texture — cheap SVG turbulence */}
-          <filter id="grain">
-            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" />
-            <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0" />
-          </filter>
-
-          {/* Bottom vignette for text contrast */}
-          <linearGradient id="vignette" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"  stopColor="rgba(0,0,0,0)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
-          </linearGradient>
         </defs>
 
-        {/* Sky background */}
-        <rect width="1000" height="400" fill={`url(#${skyGradientId})`} />
+        {/* No sky fill — the page's .sky gradient shows through, so the hero
+            is visually seamless with the rest of the page. Only the sun/moon
+            and stars float on this transparent SVG layer. */}
 
         {/* Scattered distant stars (night only, clear or snow sky) */}
         {!celestial.daytime && (skyType === 'clear' || skyType === 'snow') && (
@@ -224,13 +153,6 @@ export default function MunroHero({
             <circle cx={celestial.cx + 5} cy={celestial.cy - 3} r="3.2" fill="rgba(100, 115, 140, 0.5)" />
           )}
         </g>
-
-        {/* Grain overlay */}
-        <rect width="1000" height="400" filter="url(#grain)" opacity="0.5" />
-
-        {/* Bottom vignette for text contrast */}
-        <rect width="1000" height="120" y="280"
-          fill="url(#vignette)" opacity="0.7" pointerEvents="none" />
       </svg>
 
       {/* ── Foreground content ── */}
@@ -287,37 +209,73 @@ export default function MunroHero({
                 <span className="mhero-stat-dim">{view.windDirLabel}</span>
               </dd>
             </div>
-            <div className="mhero-stat mhero-stat-chips">
-              <dt>Ascent</dt>
-              <dd>
-                <span
-                  className="mhero-chip"
-                  style={{
-                    '--chip-color': view.risk.riskColor,
-                  }}
-                >
-                  <span className="mhero-chip-dot" />
-                  {RISK_LABELS[view.risk.band]}
-                </span>
-                {midge && (
-                  <span
-                    className="mhero-chip mhero-chip-midge"
-                    style={{
-                      '--chip-color': midge.color || '#38bdf8',
-                    }}
-                    title="Midge activity forecast"
-                  >
-                    <span className="mhero-chip-dot" />
-                    Midge · {midge.label}
-                  </span>
-                )}
-              </dd>
-            </div>
           </dl>
+        </div>
+
+        {/* Ring gauges sit below the main bottom row, aligned right, so they
+            share horizontal rhythm with the stat stack above them. */}
+        <div className="mhero-rings">
+          <Ring
+            label="Ascent"
+            value={RISK_LABELS[view.risk.band]}
+            percent={(view.risk.band + 1) * 20}
+            color={view.risk.riskColor}
+          />
+          {midge && (
+            <Ring
+              label="Midge"
+              value={midge.label}
+              percent={Math.max(20, (midge.level || 1) * 20)}
+              color={midge.color || '#38bdf8'}
+            />
+          )}
         </div>
 
         {hourBanner}
       </div>
     </header>
+  );
+}
+
+/**
+ * Ring — compact radial severity gauge used in the hero.
+ * Same visual language for Ascent and Midge: a 40px stroked circle with
+ * an animated arc whose length represents the severity, a coloured dot in
+ * the centre, and the value + label beside it.
+ */
+function Ring({ label, value, percent, color }) {
+  // Geometry: r=15 → circumference ≈ 94.25. Arc length = circumference * pct.
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  const dash = c * Math.max(0, Math.min(1, percent / 100));
+  return (
+    <div className="mhero-ring">
+      <svg className="mhero-ring-svg" viewBox="0 0 40 40" aria-hidden="true">
+        {/* Track */}
+        <circle
+          cx="20" cy="20" r={r}
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.18)"
+          strokeWidth="3"
+        />
+        {/* Progress arc — starts at 12 o'clock, clockwise */}
+        <circle
+          cx="20" cy="20" r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="3"
+          strokeDasharray={`${dash} ${c}`}
+          strokeLinecap="round"
+          transform="rotate(-90 20 20)"
+          style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(.16,1,.3,1)' }}
+        />
+        {/* Inner dot echoing the color */}
+        <circle cx="20" cy="20" r="3" fill={color} />
+      </svg>
+      <div className="mhero-ring-text">
+        <div className="mhero-ring-label">{label}</div>
+        <div className="mhero-ring-value">{value}</div>
+      </div>
+    </div>
   );
 }
