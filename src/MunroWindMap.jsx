@@ -350,16 +350,25 @@ export default function MunroWindMap({ onClose }) {
         type: 'line',
         source: 'wind-streamlines',
         paint: {
-          // Soft glow underneath — wider, very low alpha
-          'line-color': '#bfe4ff',
+          // Colour-graded by wind speed — matches the 5-band palette used
+          // for the arrow badges so the legend applies equally to both
+          // layers. Thresholds in m/s correspond to 10/20/30/40 mph.
+          'line-color': [
+            'step', ['get', 'speed'],
+            '#22c55e',
+            4.47, '#84cc16',
+            8.94, '#eab308',
+            13.41, '#f97316',
+            17.88, '#ef4444',
+          ],
           'line-width': [
             'interpolate', ['linear'], ['zoom'],
-            5, 1.8,
-            8, 2.6,
-            11, 3.4,
+            5, 2.2,
+            8, 3.2,
+            11, 4.2,
           ],
-          'line-opacity': ['*', ['get', 'opacity'], 0.35],
-          'line-blur': 1.4,
+          'line-opacity': ['*', ['get', 'opacity'], 0.4],
+          'line-blur': 1.8,
         },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       });
@@ -368,15 +377,21 @@ export default function MunroWindMap({ onClose }) {
         type: 'line',
         source: 'wind-streamlines',
         paint: {
-          // Crisp line on top — thin, higher alpha
-          'line-color': '#cfe8ff',
+          'line-color': [
+            'step', ['get', 'speed'],
+            '#34d399',
+            4.47, '#a3e635',
+            8.94, '#fbbf24',
+            13.41, '#fb923c',
+            17.88, '#f87171',
+          ],
           'line-width': [
             'interpolate', ['linear'], ['zoom'],
-            5, 0.6,
-            8, 0.9,
-            11, 1.2,
+            5, 0.7,
+            8, 1.0,
+            11, 1.4,
           ],
-          'line-opacity': ['get', 'opacity'],
+          'line-opacity': ['*', ['get', 'opacity'], 1.2],
         },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       });

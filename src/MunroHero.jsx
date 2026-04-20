@@ -30,6 +30,7 @@ import { RISK_LABELS } from './risk.js';
  */
 export default function MunroHero({
   view, munro, useF, onUnitToggle, skyType, midge, hourBanner,
+  onPeakNameClick, onRingClick,
 }) {
   const tempC = view.temp;
   const tempF = Math.round((tempC * 9) / 5 + 32);
@@ -197,7 +198,21 @@ export default function MunroHero({
             <span className="mhero-dot" />
             {isPreview ? `Previewing · ${view.label}` : 'Live forecast'}
           </div>
-          <h1 className="mhero-peak-name">{munro.name}</h1>
+          <h1 className="mhero-peak-name">
+            {onPeakNameClick ? (
+              <button
+                type="button"
+                className="mhero-peak-name-btn"
+                onClick={onPeakNameClick}
+                aria-label={`Show ${munro.name} on map`}
+              >
+                {munro.name}
+                <svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true" className="mhero-peak-name-icon">
+                  <path d="M2 7 L12 7 M8 3 L12 7 L8 11" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : munro.name}
+          </h1>
           <div className="mhero-peak-meta">
             <span>{munro.region}</span>
             <span className="mhero-peak-sep" aria-hidden="true">·</span>
@@ -270,18 +285,23 @@ export default function MunroHero({
             Wind shows direction inside the ring; Ascent shows the band
             number (1-5); Midge shows the level (1-5). */}
         <div className="mhero-rings">
-          <div className="mhero-ring mhero-ring--compass">
+          <button
+            type="button"
+            className="mhero-ring mhero-ring--compass mhero-ring-btn"
+            onClick={() => onRingClick?.('wind')}
+            aria-label="Jump to conditions"
+          >
             <div className="mhero-compass" aria-hidden="true">
               <svg viewBox="0 0 40 40" width="40" height="40">
-                {/* Compass ring */}
                 <circle cx="20" cy="20" r="17" fill="rgba(15, 25, 40, 0.45)"
                   stroke="rgba(255, 255, 255, 0.28)" strokeWidth="1" />
-                {/* Cardinal marks */}
                 <line x1="20" y1="4"  x2="20" y2="7"  stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
                 <line x1="20" y1="33" x2="20" y2="36" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
                 <line x1="4"  y1="20" x2="7"  y2="20" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
                 <line x1="33" y1="20" x2="36" y2="20" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
-                {/* Rotating arrow, anchored in centre */}
+                {/* Compass arrow points FROM (meteorological convention).
+                    The wind bearing IS the FROM direction, so rotate directly
+                    without the +180 we used for flow arrows elsewhere. */}
                 <g style={{ transform: `rotate(${view.bearing || 0}deg)`, transformOrigin: '20px 20px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
                   <path
                     d="M20 7 L23.6 18 L20 16 L16.4 18 Z"
@@ -293,28 +313,30 @@ export default function MunroHero({
                   <circle cx="20" cy="20" r="1.6" fill="#ffffff" />
                 </g>
               </svg>
-              {/* N/E/S/W letters overlaid — outside the ring, tiny */}
               <span className="mhero-compass-letter mhero-compass-n">N</span>
             </div>
             <div className="mhero-ring-text">
               <div className="mhero-ring-label">Wind</div>
               <div className="mhero-ring-value">{view.wind} mph {view.windDirLabel}</div>
             </div>
-          </div>
+          </button>
+
           <Ring
             label="Ascent"
             value={toTitleCase(RISK_LABELS[view.risk.band])}
             percent={(view.risk.band + 1) * 20}
             color={view.risk.riskColor}
             inner={<span className="mhero-ring-num">{view.risk.band + 1}</span>}
+            onClick={onRingClick ? () => onRingClick('ascent') : undefined}
           />
           {midge && (
             <Ring
               label="Midge"
               value={midge.label}
               percent={Math.max(20, (midge.level || 1) * 20)}
-              color={midge.color || '#94a3b8'}
+              color="#ffffff"
               inner={<span className="mhero-ring-num">{midge.level || 1}</span>}
+              onClick={onRingClick ? () => onRingClick('midge') : undefined}
             />
           )}
         </div>
@@ -340,13 +362,18 @@ export default function MunroHero({
  *   inner  — optional ReactNode rendered INSIDE the ring (number, arrow)
  *            falls back to a small white dot if not provided
  */
-function Ring({ label, value, percent, color, inner }) {
+function Ring({ label, value, percent, color, inner, onClick }) {
   // Geometry: r=15 → circumference ≈ 94.25. Arc length = circumference * pct.
   const r = 15;
   const c = 2 * Math.PI * r;
   const dash = c * Math.max(0, Math.min(1, percent / 100));
+  const Component = onClick ? 'button' : 'div';
   return (
-    <div className="mhero-ring">
+    <Component
+      className={`mhero-ring ${onClick ? 'mhero-ring-btn' : ''}`}
+      onClick={onClick}
+      {...(onClick ? { type: 'button', 'aria-label': `Jump to ${label.toLowerCase()}` } : {})}
+    >
       <div className="mhero-ring-stack">
         <svg className="mhero-ring-svg" viewBox="0 0 40 40" aria-hidden="true">
           <circle
@@ -374,6 +401,6 @@ function Ring({ label, value, percent, color, inner }) {
         <div className="mhero-ring-label">{label}</div>
         <div className="mhero-ring-value">{value}</div>
       </div>
-    </div>
+    </Component>
   );
 }

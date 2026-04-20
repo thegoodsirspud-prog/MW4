@@ -959,6 +959,115 @@ button { font-family: inherit; }
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+/* ── Condensed Conditions card ────────────────────────────────────────
+   Single glass container that replaces the old 2×3 metric grid. Top row
+   is the compass + wind primary info; divider; bottom row is a 4-across
+   row of compact metric tiles. */
+.conditions-card {
+  padding: 16px 18px 14px;
+  overflow: hidden;
+}
+.conditions-wind {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 14px;
+}
+.compass--lg {
+  flex-shrink: 0;
+  width: 82px;
+  height: 82px;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+}
+.conditions-wind-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.conditions-wind-primary {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: #ffffff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.conditions-wind-primary small {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.72);
+  margin-left: 4px;
+}
+.conditions-wind-gust {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+}
+.conditions-wind-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.conditions-wind-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa, #93c5fd);
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(.4, 0, .2, 1);
+}
+.conditions-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.conditions-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.conditions-metric-head {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+.conditions-metric-value {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.conditions-metric-value small {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  margin-left: 2px;
+}
+.conditions-metric-sub {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.62);
+  letter-spacing: 0.1px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .metric {
   padding: 14px;
   position: relative;
@@ -1134,6 +1243,75 @@ button { font-family: inherit; }
 }
 
 /* Footer */
+/* ── WalkHighlands route link card ──────────────────────────────────
+   Styled consistently with the other glass panels. Body row shows
+   a boots emoji + heading + subhead. A distinct CTA button links out. */
+.walkhighlands-card {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.walkhighlands-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.walkhighlands-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+.walkhighlands-text {
+  min-width: 0;
+  flex: 1;
+}
+.walkhighlands-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.1px;
+  margin-bottom: 2px;
+}
+.walkhighlands-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.68);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.walkhighlands-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(96, 165, 250, 0.22);
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  border-radius: 100px;
+  color: #93c5fd;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.walkhighlands-link:hover {
+  background: rgba(96, 165, 250, 0.35);
+  border-color: rgba(96, 165, 250, 0.8);
+  color: #bfdbfe;
+}
+.walkhighlands-link:active { transform: scale(0.96); }
+
 .app-footer {
   text-align: center;
   padding: 30px 0 12px;
@@ -1688,12 +1866,32 @@ button { font-family: inherit; }
   color: #ffffff;
   letter-spacing: 0.2px;
 }
+.best-peak-loading-bar-track {
+  width: 220px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.best-peak-loading-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #ffd27a);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
 .best-peak-loading-sub {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.72);
-  max-width: 280px;
-  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4px;
+}
+.best-peak-rank-num {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: -0.5px;
 }
 .best-peak-error {
   padding: 40px 20px;

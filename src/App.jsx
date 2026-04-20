@@ -414,6 +414,24 @@ function buildHourlyViews(wx) {
   return hrs;
 }
 
+/**
+ * Convert a Munro name to a WalkHighlands URL slug.
+ * Pattern: lowercase, strip diacritics, remove apostrophes,
+ * replace spaces/non-alphanum with hyphens, collapse consecutive hyphens.
+ * Covers all 282 names without a lookup table.
+ * Verified against: ben-nevis, cairn-gorm, sgurr-choinnich-mor,
+ *   carn-mor-dearg, aonach-beag-nevis-range, beinn-a-bhuird.
+ */
+function munroToSlug(name) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // strip diacritics
+    .toLowerCase()
+    .replace(/'/g, '')                // remove apostrophes (Beinn a'Bhuird → beinn-abhuird)
+    .replace(/[^a-z0-9]+/g, '-')     // non-alphanum → hyphen
+    .replace(/^-|-$/g, '');          // trim leading/trailing hyphens
+}
+
 // Helper: nearest hourly reading
 function nearestHourlyValue(wx, key) {
   if (!wx?.hourly?.[key]) return null;
@@ -447,7 +465,7 @@ function midDayHourlyForDay(wx, dateIso, key, fallback) {
 // ════════════════════════════════════════════════════════════════════════════
 // Risk Hub Section — Overall + Mountain Safety + Midge, all expandable
 // ════════════════════════════════════════════════════════════════════════════
-function RiskHub({ activeView, midge, unitF }) {
+function RiskHub({ activeView, midge, unitF, midgeRef }) {
   const [expandedId, setExpandedId] = useState(null);
   const toggle = (id) => setExpandedId(expandedId === id ? null : id);
 
@@ -532,22 +550,23 @@ function RiskHub({ activeView, midge, unitF }) {
       </section>
 
       {/* MIDGE — single unified card */}
-      <ExpandableRiskCard
-        icon={<MidgeIcon size={22} color={midge.color} />}
-        eyebrow="Midge Forecast"
-        title={midge.dormant ? 'Dormant season · no activity' : `Level ${midge.level} of 5 · ${midge.label}`}
-        desc={midge.desc}
-        color={midge.color}
-        gaugeValue={midge.level}
-        gaugeMax={5}
-        segments={5}
-        expanded={expandedId === 'midge'}
-        onToggle={() => toggle('midge')}
-      >
-        <div className="midge-segments">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="midge-segment" style={{
-              background: i <= midge.level ? midge.color : 'rgba(255,255,255,0.08)',
+      <div ref={midgeRef}>
+        <ExpandableRiskCard
+          icon={<MidgeIcon size={22} color="#ffffff" />}
+          eyebrow="Midge Forecast"
+          title={midge.dormant ? 'Dormant season · no activity' : `Level ${midge.level} of 5 · ${midge.label}`}
+          desc={midge.desc}
+          color="#ffffff"
+          gaugeValue={midge.level}
+          gaugeMax={5}
+          segments={5}
+          expanded={expandedId === 'midge'}
+          onToggle={() => toggle('midge')}
+        >
+          <div className="midge-segments">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="midge-segment" style={{
+                background: i <= midge.level ? '#ffffff' : 'rgba(255,255,255,0.08)',
               opacity: i <= midge.level ? 1 : 0.4,
             }} />
           ))}
@@ -579,7 +598,8 @@ function RiskHub({ activeView, midge, unitF }) {
             For active-season forecasts, return in spring.
           </div>
         )}
-      </ExpandableRiskCard>
+        </ExpandableRiskCard>
+      </div>
     </div>
   );
 }
@@ -919,6 +939,22 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
   const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState('home'); // home | peaks | map | wind
 
+  // Scroll targets for hero ring taps — each ring deep-links to the
+  // section whose info it summarises. Refs kept at App scope so the
+  // hero can fire onRingClick('wind' | 'ascent' | 'midge') without
+  // prop-drilling the refs themselves.
+  const conditionsRef = useRef(null);
+  const riskHubRef = useRef(null);
+  const midgeRef = useRef(null);
+  const handleRingClick = (kind) => {
+    const target = kind === 'wind' ? conditionsRef.current
+                 : kind === 'ascent' ? riskHubRef.current
+                 : kind === 'midge' ? midgeRef.current
+                 : null;
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   // Search & region filter for home screen
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState(null);
@@ -1182,6 +1218,8 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           onUnitToggle={() => setUseFahrenheit(!useFahrenheit)}
           skyType={skyType}
           midge={midge}
+          onPeakNameClick={() => setPage('map')}
+          onRingClick={handleRingClick}
           hourBanner={
             selectedMode === 'hour' ? (
               <div className="mhero-hour-banner">
@@ -1258,61 +1296,107 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           </nav>
         </section>
 
-        {/* CONDITIONS — wind + 4 metrics */}
-        <section className="section">
+        {/* CONDITIONS — all five measurements in one condensed card,
+            matching the Mountain Safety consolidation. */}
+        <section className="section" ref={conditionsRef}>
           <h2 className="section-title"><span>Conditions</span></h2>
-          <div className="metrics">
-            <div className="metric glass wind-widget">
-              <div className="compass">
-                <svg viewBox="0 0 82 82">
-                  <circle cx="41" cy="41" r="36" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
-                  <circle cx="41" cy="41" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
-                  <text x="41" y="12" fill="rgba(245,245,247,.55)" fontSize="9" fontWeight="500" textAnchor="middle">N</text>
-                  <text x="76" y="44" fill="rgba(245,245,247,.35)" fontSize="9" fontWeight="500" textAnchor="middle">E</text>
-                  <text x="41" y="76" fill="rgba(245,245,247,.35)" fontSize="9" fontWeight="500" textAnchor="middle">S</text>
-                  <text x="6"  y="44" fill="rgba(245,245,247,.35)" fontSize="9" fontWeight="500" textAnchor="middle">W</text>
-                  <g transform={`rotate(${(activeView.bearing + 180) % 360} 41 41)`} className="compass-arrow">
-                    <path d="M41 12 L46 41 L41 36 L36 41 Z" fill="#60a5fa" />
+          <div className="conditions-card glass">
+            <div className="conditions-wind">
+              <div className="compass compass--lg" aria-hidden="true">
+                <svg viewBox="0 0 82 82" width="82" height="82">
+                  <circle cx="41" cy="41" r="36" fill="rgba(15, 25, 40, 0.4)"
+                    stroke="rgba(255, 255, 255, 0.22)" strokeWidth="1" />
+                  <line x1="41" y1="7"  x2="41" y2="12" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                  <line x1="41" y1="70" x2="41" y2="75" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                  <line x1="7"  y1="41" x2="12" y2="41" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                  <line x1="70" y1="41" x2="75" y2="41" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                  <text x="41" y="13" fill="rgba(245, 245, 247, 0.72)" fontSize="8.5" fontWeight="700" textAnchor="middle" letterSpacing="0.4">N</text>
+                  <text x="71" y="44" fill="rgba(245, 245, 247, 0.55)" fontSize="8.5" fontWeight="700" textAnchor="middle">E</text>
+                  <text x="41" y="76" fill="rgba(245, 245, 247, 0.55)" fontSize="8.5" fontWeight="700" textAnchor="middle">S</text>
+                  <text x="11" y="44" fill="rgba(245, 245, 247, 0.55)" fontSize="8.5" fontWeight="700" textAnchor="middle">W</text>
+                  {/* Arrow points FROM — meteorological convention. The
+                      bearing IS the FROM direction, so rotate directly. */}
+                  <g style={{ transform: `rotate(${activeView.bearing || 0}deg)`, transformOrigin: '41px 41px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
+                    <path
+                      d="M41 13 L48 38 L41 34 L34 38 Z"
+                      fill="#60a5fa"
+                      stroke="rgba(15, 25, 40, 0.7)"
+                      strokeWidth="0.8"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="41" cy="41" r="2.4" fill="#ffffff" />
                   </g>
                 </svg>
               </div>
-              <div className="wind-info">
-                <div className="wind-primary">{activeView.wind} <small>mph {activeView.windDirLabel}</small></div>
-                <div className="wind-gust">Gusting {activeView.gust} mph</div>
-                <div className="wind-bar">
-                  <div className="wind-fill" style={{ width: `${Math.min(100, activeView.wind * 2)}%` }} />
+              <div className="conditions-wind-info">
+                <div className="conditions-wind-primary">
+                  {activeView.wind} <small>mph {activeView.windDirLabel}</small>
+                </div>
+                <div className="conditions-wind-gust">Gusting {activeView.gust} mph</div>
+                <div className="conditions-wind-bar">
+                  <div className="conditions-wind-fill" style={{ width: `${Math.min(100, activeView.wind * 2)}%` }} />
                 </div>
               </div>
             </div>
 
-            <div className="metric glass">
-              <div className="metric-head"><span>Visibility</span></div>
-              <div className="metric-value">{activeView.visibility != null ? activeView.visibility : '—'}<small>km</small></div>
-              <div className="metric-sub">{visibilityLabel(activeView.visibility)}</div>
-            </div>
-
-            <div className="metric glass">
-              <div className="metric-head"><span>Humidity</span></div>
-              <div className="metric-value">{activeView.humidity}<small>%</small></div>
-              <div className="metric-sub">{humidityLabel(activeView.humidity)}</div>
-            </div>
-
-            <div className="metric glass">
-              <div className="metric-head"><span>Pressure</span></div>
-              <div className="metric-value">{activeView.pressure || '—'}<small>hPa</small></div>
-              <div className="metric-sub">{pressureLabel(activeView.pressure)}</div>
-            </div>
-
-            <div className="metric glass">
-              <div className="metric-head"><span>Precipitation</span></div>
-              <div className="metric-value">{activeView.precip}<small>%</small></div>
-              <div className="metric-sub">{precipLabel(activeView.precip)}</div>
+            <div className="conditions-metrics">
+              <div className="conditions-metric">
+                <div className="conditions-metric-head">Visibility</div>
+                <div className="conditions-metric-value">
+                  {activeView.visibility != null ? activeView.visibility : '—'}<small>km</small>
+                </div>
+                <div className="conditions-metric-sub">{visibilityLabel(activeView.visibility)}</div>
+              </div>
+              <div className="conditions-metric">
+                <div className="conditions-metric-head">Humidity</div>
+                <div className="conditions-metric-value">{activeView.humidity}<small>%</small></div>
+                <div className="conditions-metric-sub">{humidityLabel(activeView.humidity)}</div>
+              </div>
+              <div className="conditions-metric">
+                <div className="conditions-metric-head">Pressure</div>
+                <div className="conditions-metric-value">{activeView.pressure || '—'}<small>hPa</small></div>
+                <div className="conditions-metric-sub">{pressureLabel(activeView.pressure)}</div>
+              </div>
+              <div className="conditions-metric">
+                <div className="conditions-metric-head">Precip</div>
+                <div className="conditions-metric-value">{activeView.precip}<small>%</small></div>
+                <div className="conditions-metric-sub">{precipLabel(activeView.precip)}</div>
+              </div>
             </div>
           </div>
         </section>
 
         {/* RISK HUB — Overall + Mountain + Midge */}
-        <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} />
+        <div ref={riskHubRef}>
+          <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} midgeRef={midgeRef} />
+        </div>
+
+        {/* WALKHIGHLANDS — route link for the current peak */}
+        <section className="section">
+          <div className="walkhighlands-card glass">
+            <div className="walkhighlands-body">
+              <div className="walkhighlands-icon" aria-hidden="true">🥾</div>
+              <div className="walkhighlands-text">
+                <div className="walkhighlands-title">Walking routes</div>
+                <div className="walkhighlands-sub">
+                  Route guides, walk reports and conditions for {munro.name}
+                </div>
+              </div>
+            </div>
+            <a
+              href={`https://www.walkhighlands.co.uk/munros/${munroToSlug(munro.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="walkhighlands-link"
+              aria-label={`View walking routes for ${munro.name} on WalkHighlands`}
+            >
+              View on WalkHighlands
+              <svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
+          </div>
+        </section>
 
         <footer className="app-footer">
           Summit weather: Open-Meteo · Risk: MWIS methodology · Midge: APS Biocontrol research

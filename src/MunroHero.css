@@ -359,6 +359,48 @@
   min-width: 0;
 }
 
+/* Interactive rings: strip default button chrome, inherit colours,
+   add tiny hover affordance so the tappable nature is discoverable. */
+.mhero-ring-btn {
+  background: none;
+  border: none;
+  padding: 4px 6px 4px 4px;
+  margin: -4px -6px -4px -4px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+  text-align: left;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.mhero-ring-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.mhero-ring-btn:active { transform: scale(0.96); }
+
+/* Peak-name button — inline inside <h1>, chevron icon on the right
+   to hint that it's tappable. */
+.mhero-peak-name-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  transition: opacity 0.15s ease;
+}
+.mhero-peak-name-btn:hover { opacity: 0.82; }
+.mhero-peak-name-btn:active { opacity: 0.7; }
+.mhero-peak-name-icon {
+  opacity: 0.55;
+  transform: translateY(-3px);
+  flex-shrink: 0;
+}
+
 /* Mini compass in the hero — matches the Conditions card compass but
    shrunk to 40px to fit the ring trio. Arrow rotates to wind bearing. */
 .mhero-compass {
