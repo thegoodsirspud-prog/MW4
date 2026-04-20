@@ -1702,51 +1702,41 @@ button { font-family: inherit; }
   font-size: 13px;
 }
 
-/* Reset-view button — sits below MapLibre's zoom controls, same visual
-   language (dark translucent panel, 1px white outline, white icon). */
-.tile-map-reset {
+/* Map controls — labelled pill buttons, grouped top-left. Always
+   visible, self-describing, mobile-friendly. */
+.tile-map-controls {
   position: absolute;
-  top: 94px;             /* below the zoom +/- pair */
-  right: 12px;
+  top: 12px;
+  left: 12px;
   z-index: 3;
-  width: 29px; height: 29px;
-  border-radius: 10px;
-  background: rgba(15, 25, 40, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  color: #ffffff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s ease, transform 0.1s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.tile-map-reset:hover { background: rgba(30, 45, 65, 0.9); }
-.tile-map-reset:active { transform: scale(0.95); }
-
-/* Locate-me button — directly below the reset, same dimensions, same
-   visual language. Active state glows blue when a user location is set. */
-.tile-map-locate {
-  position: absolute;
-  top: 132px;
-  right: 12px;
-  z-index: 3;
-  width: 29px; height: 29px;
-  border-radius: 10px;
-  background: rgba(15, 25, 40, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+.tile-map-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 10px;
+  background: rgba(15, 25, 40, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 100px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
   transition: background 0.15s ease, transform 0.1s ease,
               border-color 0.15s ease, color 0.15s ease;
 }
-.tile-map-locate:hover { background: rgba(30, 45, 65, 0.9); }
-.tile-map-locate:active { transform: scale(0.95); }
-.tile-map-locate-active {
+.tile-map-ctrl:hover { background: rgba(30, 45, 65, 0.92); }
+.tile-map-ctrl:active { transform: scale(0.96); }
+.tile-map-ctrl svg { flex-shrink: 0; }
+.tile-map-ctrl-active {
   color: #60a5fa;
   border-color: rgba(96, 165, 250, 0.6);
   box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.35),

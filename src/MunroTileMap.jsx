@@ -375,36 +375,38 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
       </div>
       <div ref={containerRef} className="tile-map-viewport">
-        <button
-          className="tile-map-reset"
-          onClick={resetView}
-          aria-label="Reset view to full Scotland"
-          title="Reset view"
-        >
-          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-            <path
-              d="M10 3 L10 7 M3 10 L7 10 M10 13 L10 17 M13 10 L17 10"
-              stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
-            />
-            <circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-          </svg>
-        </button>
+        <div className="tile-map-controls">
+          <button
+            className="tile-map-ctrl"
+            onClick={resetView}
+            aria-label="Reset view to full Scotland"
+          >
+            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+              <path
+                d="M10 3 L10 7 M3 10 L7 10 M10 13 L10 17 M13 10 L17 10"
+                stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+              />
+              <circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
+            <span>Reset</span>
+          </button>
 
-        <button
-          className={`tile-map-locate ${userPos ? 'tile-map-locate-active' : ''}`}
-          onClick={requestLocation}
-          aria-label="Show my location"
-          title="My location"
-        >
-          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-            <circle cx="10" cy="10" r="3" fill="currentColor" />
-            <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.5" />
-            <line x1="10" y1="1.5" x2="10" y2="4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            <line x1="10" y1="16" x2="10" y2="18.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            <line x1="1.5" y1="10" x2="4" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            <line x1="16" y1="10" x2="18.5" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </button>
+          <button
+            className={`tile-map-ctrl ${userPos ? 'tile-map-ctrl-active' : ''}`}
+            onClick={requestLocation}
+            aria-label="Show my location"
+          >
+            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+              <circle cx="10" cy="10" r="3" fill="currentColor" />
+              <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.5" />
+              <line x1="10" y1="1.5" x2="10" y2="4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="10" y1="16" x2="10" y2="18.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="1.5" y1="10" x2="4" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="16" y1="10" x2="18.5" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>My location</span>
+          </button>
+        </div>
 
         {geoError && (
           <div className="tile-map-toast" role="status">{geoError}</div>

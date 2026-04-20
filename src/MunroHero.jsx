@@ -33,7 +33,6 @@ export default function MunroHero({
 }) {
   const tempC = view.temp;
   const tempF = Math.round((tempC * 9) / 5 + 32);
-  const hour = view.rawHour ?? new Date().getHours();
 
   // Format an ISO datetime to HH:MM in the user's locale, falling back
   // gracefully when the data isn't present (e.g. first render before fetch).
@@ -52,6 +51,12 @@ export default function MunroHero({
   // When the user taps a specific hour or day, viewKey is not 'current'.
   // The eyebrow reflects this — live green dot becomes amber "previewing".
   const isPreview = view.viewKey !== 'current';
+  // Daily previews represent a whole day, not a moment — so we hide the
+  // sun/moon tracker (it would be misleading for a summary view) and
+  // pin the sky to a mid-morning hour regardless of when the user
+  // opened the app. Hourly and current views still animate through the day.
+  const isDailyPreview = typeof view.viewKey === 'string' && view.viewKey.startsWith('day-');
+  const hour = isDailyPreview ? 11 : (view.rawHour ?? new Date().getHours());
 
   // Convert "MODERATE" to "Moderate" — Ascent and Midge values should
   // read with identical case so the ring pair looks like a set, not a
@@ -143,8 +148,10 @@ export default function MunroHero({
             is visually seamless with the rest of the page. Only the sun/moon
             and stars float on this transparent SVG layer. */}
 
-        {/* Scattered distant stars (night only, clear or snow sky) */}
-        {!celestial.daytime && (skyType === 'clear' || skyType === 'snow') && (
+        {/* Scattered distant stars (night only, clear or snow sky).
+            Hidden on daily previews — they represent a whole day, not a
+            moment, so showing night stars would be misleading. */}
+        {!celestial.daytime && !isDailyPreview && (skyType === 'clear' || skyType === 'snow') && (
           <g opacity="0.7">
             {[
               [110, 40], [230, 28], [320, 70], [440, 35], [560, 55],
@@ -158,26 +165,29 @@ export default function MunroHero({
           </g>
         )}
 
-        {/* Celestial body — sun or moon */}
-        <g style={{ transform: `translate(${pxCelestial}px, ${pyCelestial}px)` }}>
-          <circle
-            cx={celestial.cx}
-            cy={celestial.cy}
-            r="90"
-            fill={celestial.daytime ? 'url(#sun-glow)' : 'url(#moon-glow)'}
-            opacity="0.8"
-          />
-          <circle
-            cx={celestial.cx}
-            cy={celestial.cy}
-            r={celestial.daytime ? 18 : 14}
-            fill={celestial.daytime ? '#ffe4a8' : '#dce6f5'}
-            opacity={celestial.daytime ? 0.95 : 0.9}
-          />
-          {!celestial.daytime && (
-            <circle cx={celestial.cx + 5} cy={celestial.cy - 3} r="3.2" fill="rgba(100, 115, 140, 0.5)" />
-          )}
-        </g>
+        {/* Celestial body — sun or moon. Suppressed on daily previews
+            because a day-summary shouldn't pick a moment to depict. */}
+        {!isDailyPreview && (
+          <g style={{ transform: `translate(${pxCelestial}px, ${pyCelestial}px)` }}>
+            <circle
+              cx={celestial.cx}
+              cy={celestial.cy}
+              r="90"
+              fill={celestial.daytime ? 'url(#sun-glow)' : 'url(#moon-glow)'}
+              opacity="0.8"
+            />
+            <circle
+              cx={celestial.cx}
+              cy={celestial.cy}
+              r={celestial.daytime ? 18 : 14}
+              fill={celestial.daytime ? '#ffe4a8' : '#dce6f5'}
+              opacity={celestial.daytime ? 0.95 : 0.9}
+            />
+            {!celestial.daytime && (
+              <circle cx={celestial.cx + 5} cy={celestial.cy - 3} r="3.2" fill="rgba(100, 115, 140, 0.5)" />
+            )}
+          </g>
+        )}
       </svg>
 
       {/* ── Foreground content ── */}
@@ -260,29 +270,37 @@ export default function MunroHero({
             Wind shows direction inside the ring; Ascent shows the band
             number (1-5); Midge shows the level (1-5). */}
         <div className="mhero-rings">
-          <Ring
-            label="Wind"
-            value={`${view.wind} mph`}
-            percent={Math.min(100, view.wind * 2.5)}
-            color="#60a5fa"
-            inner={(
-              <svg
-                className="mhero-ring-arrow"
-                viewBox="0 0 12 12"
-                width="14" height="14"
-                style={{ transform: `rotate(${view.bearing || 0}deg)` }}
-                aria-hidden="true"
-              >
-                <path
-                  d="M6 1.5 L9 7 L6.8 7 L6.8 10.5 L5.2 10.5 L5.2 7 L3 7 Z"
-                  fill="#60a5fa"
-                  stroke="rgba(15, 25, 40, 0.7)"
-                  strokeWidth="0.6"
-                  strokeLinejoin="round"
-                />
+          <div className="mhero-ring mhero-ring--compass">
+            <div className="mhero-compass" aria-hidden="true">
+              <svg viewBox="0 0 40 40" width="40" height="40">
+                {/* Compass ring */}
+                <circle cx="20" cy="20" r="17" fill="rgba(15, 25, 40, 0.45)"
+                  stroke="rgba(255, 255, 255, 0.28)" strokeWidth="1" />
+                {/* Cardinal marks */}
+                <line x1="20" y1="4"  x2="20" y2="7"  stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                <line x1="20" y1="33" x2="20" y2="36" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                <line x1="4"  y1="20" x2="7"  y2="20" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                <line x1="33" y1="20" x2="36" y2="20" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
+                {/* Rotating arrow, anchored in centre */}
+                <g style={{ transform: `rotate(${view.bearing || 0}deg)`, transformOrigin: '20px 20px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
+                  <path
+                    d="M20 7 L23.6 18 L20 16 L16.4 18 Z"
+                    fill="#60a5fa"
+                    stroke="rgba(15, 25, 40, 0.7)"
+                    strokeWidth="0.6"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="20" cy="20" r="1.6" fill="#ffffff" />
+                </g>
               </svg>
-            )}
-          />
+              {/* N/E/S/W letters overlaid — outside the ring, tiny */}
+              <span className="mhero-compass-letter mhero-compass-n">N</span>
+            </div>
+            <div className="mhero-ring-text">
+              <div className="mhero-ring-label">Wind</div>
+              <div className="mhero-ring-value">{view.wind} mph {view.windDirLabel}</div>
+            </div>
+          </div>
           <Ring
             label="Ascent"
             value={toTitleCase(RISK_LABELS[view.risk.band])}

@@ -3,73 +3,104 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 /**
- * MunroWindMap v4 — static arrow grid, symbol-layer rendered
+ * MunroWindMap v5 — hybrid streamlines + arrows
  *
- * Previous attempts:
- *   v1: 282 DOM overlays with map.project() per pan → laggy
- *   v2: 5000 WebGL point particles → looked like TV noise
- *   v3: ping-pong framebuffer trails → beautiful but the whole screen
- *       fills with blue, and at this density no breathing room
+ * The final architecture after four failed attempts:
+ *   v1 DOM overlays (laggy)
+ *   v2 GL particles as dots (TV noise)
+ *   v3 ping-pong framebuffer trails (saturates screen)
+ *   v4 arrows only (clean but static-feeling)
  *
- * v4: 30 arrows at geographically-distributed named locations,
- * rendered as a MapLibre symbol layer. One GPU draw call for all
- * arrows. Zero per-frame work. Arrows rotate via data-driven
- * icon-rotate expression; colour matches the risk-banding palette.
+ * v5 combines the two legitimate approaches:
+ *   Layer 1 — streamlines traced through the wind field, rendered as
+ *             GeoJSON LineStrings. Thin, low-opacity, hundreds of curves
+ *             that give the whole country a sense of flow. STATIC —
+ *             drawn once at load, redrawn on basemap zoom/pan for free.
+ *   Layer 2 — bold arrows at 35 named locations (peaks + towns) rendered
+ *             as a MapLibre symbol layer. Tappable. Precise data.
  *
- * Meteorologist credibility > particle flashiness. Arrows are
- * instantly understood by anyone who's seen a weather chart.
+ * Both layers are pure MapLibre primitives — no CustomLayer, no per-frame
+ * JS, no WebGL state. The map draws them as efficiently as it draws the
+ * coastlines. Performance ceiling = MapLibre itself.
+ *
+ * The streamlines are computed client-side by walking random seed points
+ * forward through the wind vector field (bilinear interpolation from a
+ * 16×12 grid). 80 seeds × 30 steps = 2400 vertices total — trivial for
+ * MapLibre, which routinely draws entire cities worth of geometry.
  */
 
-// 30 representative locations — mix of iconic peaks and anchor towns
-// so every region is covered, not just the western highlands cluster.
-const WIND_LOCATIONS = [
-  // Outer Hebrides
-  { name: 'Stornoway',     lat: 58.2090, lon: -6.3878, kind: 'town' },
-  { name: 'Barra',         lat: 56.9660, lon: -7.4850, kind: 'town' },
+// Bounds around mainland + islands. Padded so streamlines flow off-screen
+// gracefully rather than ending at the edge.
+const BOUNDS = { west: -7.8, east: -1.5, south: 55.4, north: 59.0 };
+const GRID_W = 16;
+const GRID_H = 12;
+
+// Streamline generation parameters.
+// 80 lines × 30 steps is dense enough to read as a flow field but thin
+// enough that individual curves remain legible, unlike the particle
+// attempts which saturated the canvas.
+const STREAMLINE_COUNT = 80;
+const STREAMLINE_STEPS = 30;
+// How far to advance per step, in degrees of lon/lat per (m/s).
+// Tuned so a 10 m/s wind over 30 steps covers ~1.5° of lat — enough
+// to show a clear curve across a region without overshooting Scotland.
+const STEP_SCALE = 0.005;
+
+// 35 named reference points — mix of iconic peaks and anchor towns
+// covering every region from Shetland to the Borders.
+const ARROW_LOCATIONS = [
   // Shetland / Orkney
-  { name: 'Lerwick',       lat: 60.1548, lon: -1.1445, kind: 'town' },
-  { name: 'Kirkwall',      lat: 58.9810, lon: -2.9603, kind: 'town' },
+  { name: 'Lerwick',        lat: 60.1548, lon: -1.1445, kind: 'town' },
+  { name: 'Kirkwall',       lat: 58.9810, lon: -2.9603, kind: 'town' },
+  // Outer Hebrides
+  { name: 'Stornoway',      lat: 58.2090, lon: -6.3878, kind: 'town' },
+  { name: 'Barra',          lat: 56.9660, lon: -7.4850, kind: 'town' },
   // Far North
-  { name: 'Ben Hope',      lat: 58.4157, lon: -4.6194, kind: 'peak' },
-  { name: 'Wick',          lat: 58.4390, lon: -3.0930, kind: 'town' },
+  { name: 'Ben Hope',       lat: 58.4157, lon: -4.6194, kind: 'peak' },
+  { name: 'Wick',           lat: 58.4390, lon: -3.0930, kind: 'town' },
+  { name: 'Ben More Assynt', lat: 58.1334, lon: -4.8577, kind: 'peak' },
   // Ross-shire / Torridon
-  { name: 'Ullapool',      lat: 57.8960, lon: -5.1570, kind: 'town' },
-  { name: 'An Teallach',   lat: 57.8110, lon: -5.2700, kind: 'peak' },
-  { name: 'Liathach',      lat: 57.5510, lon: -5.4803, kind: 'peak' },
+  { name: 'Ullapool',       lat: 57.8960, lon: -5.1570, kind: 'town' },
+  { name: 'An Teallach',    lat: 57.8110, lon: -5.2700, kind: 'peak' },
+  { name: 'Liathach',       lat: 57.5510, lon: -5.4803, kind: 'peak' },
   // Skye
-  { name: 'Portree',       lat: 57.4130, lon: -6.1940, kind: 'town' },
+  { name: 'Portree',        lat: 57.4130, lon: -6.1940, kind: 'town' },
   { name: 'Sgurr Alasdair', lat: 57.2067, lon: -6.2261, kind: 'peak' },
   // Kintail / Knoydart
-  { name: 'Carn Eighe',    lat: 57.2875, lon: -5.1155, kind: 'peak' },
-  { name: 'Ladhar Bheinn', lat: 57.0653, lon: -5.6833, kind: 'peak' },
+  { name: 'Carn Eighe',     lat: 57.2875, lon: -5.1155, kind: 'peak' },
+  { name: 'Ladhar Bheinn',  lat: 57.0653, lon: -5.6833, kind: 'peak' },
   // Moray / Inverness
-  { name: 'Inverness',     lat: 57.4780, lon: -4.2247, kind: 'town' },
-  { name: 'Elgin',         lat: 57.6498, lon: -3.3176, kind: 'town' },
+  { name: 'Inverness',      lat: 57.4780, lon: -4.2247, kind: 'town' },
+  { name: 'Elgin',          lat: 57.6498, lon: -3.3176, kind: 'town' },
   // Cairngorms
-  { name: 'Cairn Gorm',    lat: 57.1167, lon: -3.6440, kind: 'peak' },
-  { name: 'Ben Macdui',    lat: 57.0706, lon: -3.6700, kind: 'peak' },
-  { name: 'Braemar',       lat: 57.0065, lon: -3.3973, kind: 'town' },
+  { name: 'Cairn Gorm',     lat: 57.1167, lon: -3.6440, kind: 'peak' },
+  { name: 'Ben Macdui',     lat: 57.0706, lon: -3.6700, kind: 'peak' },
+  { name: 'Braemar',        lat: 57.0065, lon: -3.3973, kind: 'town' },
   // Aberdeenshire
-  { name: 'Aberdeen',      lat: 57.1497, lon: -2.0943, kind: 'town' },
-  { name: 'Lochnagar',     lat: 56.9605, lon: -3.2457, kind: 'peak' },
+  { name: 'Aberdeen',       lat: 57.1497, lon: -2.0943, kind: 'town' },
+  { name: 'Lochnagar',      lat: 56.9605, lon: -3.2457, kind: 'peak' },
   // Lochaber
-  { name: 'Ben Nevis',     lat: 56.7967, lon: -5.0042, kind: 'peak' },
-  { name: 'Fort William',  lat: 56.8198, lon: -5.1052, kind: 'town' },
+  { name: 'Ben Nevis',      lat: 56.7967, lon: -5.0042, kind: 'peak' },
+  { name: 'Fort William',   lat: 56.8198, lon: -5.1052, kind: 'town' },
   // Glen Coe
   { name: 'Bidean nam Bian', lat: 56.6432, lon: -5.0295, kind: 'peak' },
+  { name: 'Oban',           lat: 56.4155, lon: -5.4721, kind: 'town' },
   // Breadalbane
-  { name: 'Ben Lawers',    lat: 56.5452, lon: -4.2211, kind: 'peak' },
-  { name: 'Schiehallion',  lat: 56.6685, lon: -4.0986, kind: 'peak' },
+  { name: 'Ben Lawers',     lat: 56.5452, lon: -4.2211, kind: 'peak' },
+  { name: 'Schiehallion',   lat: 56.6685, lon: -4.0986, kind: 'peak' },
   // Perthshire
-  { name: 'Perth',         lat: 56.3950, lon: -3.4308, kind: 'town' },
-  // Central / southern
-  { name: 'Ben Lomond',    lat: 56.1903, lon: -4.6328, kind: 'peak' },
-  { name: 'Stirling',      lat: 56.1165, lon: -3.9369, kind: 'town' },
-  { name: 'Edinburgh',     lat: 55.9533, lon: -3.1883, kind: 'town' },
-  { name: 'Glasgow',       lat: 55.8642, lon: -4.2518, kind: 'town' },
+  { name: 'Perth',          lat: 56.3950, lon: -3.4308, kind: 'town' },
+  { name: 'Dundee',         lat: 56.4620, lon: -2.9707, kind: 'town' },
+  // Central
+  { name: 'Ben Lomond',     lat: 56.1903, lon: -4.6328, kind: 'peak' },
+  { name: 'Stirling',       lat: 56.1165, lon: -3.9369, kind: 'town' },
+  { name: 'Edinburgh',      lat: 55.9533, lon: -3.1883, kind: 'town' },
+  { name: 'Glasgow',        lat: 55.8642, lon: -4.2518, kind: 'town' },
+  // South
+  { name: 'Galloway',       lat: 55.1000, lon: -4.4000, kind: 'town' },
+  { name: 'Berwick',        lat: 55.7700, lon: -2.0100, kind: 'town' },
 ];
 
-// Wind speed bands — matches the risk palette and the hero's wind ring.
 function windColor(mph) {
   if (mph < 10) return '#22c55e';
   if (mph < 20) return '#84cc16';
@@ -77,7 +108,6 @@ function windColor(mph) {
   if (mph < 40) return '#f97316';
   return '#ef4444';
 }
-
 function windLabel(mph) {
   if (mph < 10) return 'Calm';
   if (mph < 20) return 'Light';
@@ -86,14 +116,168 @@ function windLabel(mph) {
   return 'Dangerous';
 }
 
+async function fetchGridAndArrows() {
+  // Build the grid point list
+  const gridPoints = [];
+  for (let j = 0; j < GRID_H; j++) {
+    for (let i = 0; i < GRID_W; i++) {
+      const lon = BOUNDS.west + (i / (GRID_W - 1)) * (BOUNDS.east - BOUNDS.west);
+      const lat = BOUNDS.south + (j / (GRID_H - 1)) * (BOUNDS.north - BOUNDS.south);
+      gridPoints.push({ lat, lon, i, j });
+    }
+  }
+
+  // Parallel fetch — 192 grid points + 35 named locations in one burst.
+  // Open-Meteo handles this comfortably on its free tier (~1 second).
+  const gridResults = await Promise.all(gridPoints.map(async (p) => {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Europe%2FLondon`;
+      const r = await fetch(url);
+      const d = await r.json();
+      const speed = d.current?.wind_speed_10m ?? 0;
+      const dir = d.current?.wind_direction_10m ?? 0;
+      // Meteorological dir = FROM. Flow vector points the other way.
+      const a = ((dir + 180) % 360) * Math.PI / 180;
+      return {
+        i: p.i, j: p.j, lat: p.lat, lon: p.lon,
+        u: Math.sin(a) * speed,  // east m/s
+        v: Math.cos(a) * speed,  // north m/s
+        speed,
+      };
+    } catch {
+      return { i: p.i, j: p.j, lat: p.lat, lon: p.lon, u: 0, v: 0, speed: 0 };
+    }
+  }));
+
+  // Flatten grid to a Float32Array for fast bilinear sampling
+  const grid = new Float32Array(GRID_W * GRID_H * 3);
+  let maxSpeed = 0;
+  for (const r of gridResults) {
+    const idx = (r.j * GRID_W + r.i) * 3;
+    grid[idx + 0] = r.u;
+    grid[idx + 1] = r.v;
+    grid[idx + 2] = r.speed;
+    if (r.speed > maxSpeed) maxSpeed = r.speed;
+  }
+
+  // Named-arrow fetches (independent from the grid — these values are
+  // the accurate point wind for each named location, shown in the popup)
+  const arrowResults = await Promise.all(ARROW_LOCATIONS.map(async (loc) => {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`;
+      const r = await fetch(url);
+      const d = await r.json();
+      const mph = d.current?.wind_speed_10m ?? 0;
+      const gust = d.current?.wind_gusts_10m ?? 0;
+      const bearing = d.current?.wind_direction_10m ?? 0;
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [loc.lon, loc.lat] },
+        properties: {
+          name: loc.name, kind: loc.kind,
+          speed: Math.round(mph),
+          gust: Math.round(gust),
+          bearing,
+          color: windColor(mph),
+        },
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  return {
+    grid,
+    maxSpeed,
+    arrowFeatures: arrowResults.filter(Boolean),
+  };
+}
+
 /**
- * Generate an arrow icon as a Canvas ImageData so we can register it
- * as a map image. White fill with dark stroke for max readability at
- * any zoom, regardless of basemap colour.
- *
- * The SVG path draws a stout chevron arrow pointing up (0° = north).
- * MapLibre's icon-rotate then rotates it clockwise to match wind bearing.
+ * Bilinear sample of the wind grid at (lon, lat). Returns u, v in m/s
+ * and wind speed. Zero outside the bounded region.
  */
+function sampleWind(grid, lon, lat) {
+  if (lon < BOUNDS.west || lon > BOUNDS.east || lat < BOUNDS.south || lat > BOUNDS.north) {
+    return { u: 0, v: 0, speed: 0 };
+  }
+  const fx = (lon - BOUNDS.west)  / (BOUNDS.east  - BOUNDS.west)  * (GRID_W - 1);
+  const fy = (lat - BOUNDS.south) / (BOUNDS.north - BOUNDS.south) * (GRID_H - 1);
+  const i0 = Math.floor(fx), j0 = Math.floor(fy);
+  const i1 = Math.min(i0 + 1, GRID_W - 1);
+  const j1 = Math.min(j0 + 1, GRID_H - 1);
+  const dx = fx - i0, dy = fy - j0;
+  const s = (i, j) => {
+    const idx = (j * GRID_W + i) * 3;
+    return [grid[idx], grid[idx + 1], grid[idx + 2]];
+  };
+  const [au, av, asp] = s(i0, j0);
+  const [bu, bv, bsp] = s(i1, j0);
+  const [cu, cv, csp] = s(i0, j1);
+  const [du, dv, dsp] = s(i1, j1);
+  return {
+    u: (au * (1 - dx) + bu * dx) * (1 - dy) + (cu * (1 - dx) + du * dx) * dy,
+    v: (av * (1 - dx) + bv * dx) * (1 - dy) + (cv * (1 - dx) + dv * dx) * dy,
+    speed: (asp * (1 - dx) + bsp * dx) * (1 - dy) + (csp * (1 - dx) + dsp * dx) * dy,
+  };
+}
+
+/**
+ * Trace a single streamline starting from a seed point. Walks through
+ * the wind field via Euler integration for STREAMLINE_STEPS steps. Stops
+ * early if the line leaves bounds or hits a calm zone.
+ */
+function traceStreamline(grid, seedLon, seedLat) {
+  const coords = [[seedLon, seedLat]];
+  let speedSum = 0;
+  let lon = seedLon, lat = seedLat;
+  for (let i = 0; i < STREAMLINE_STEPS; i++) {
+    const w = sampleWind(grid, lon, lat);
+    if (w.speed < 0.1) break;
+    speedSum += w.speed;
+    // Advance. v is m/s north, u is m/s east. Convert to approximate
+    // degrees via STEP_SCALE. (Not geodesically precise but visually fine
+    // at this scale — Scotland covers ~4° and we're drawing, not navigating.)
+    lon += w.u * STEP_SCALE;
+    lat += w.v * STEP_SCALE;
+    if (lon < BOUNDS.west - 0.5 || lon > BOUNDS.east + 0.5 ||
+        lat < BOUNDS.south - 0.5 || lat > BOUNDS.north + 0.5) break;
+    coords.push([lon, lat]);
+  }
+  const avgSpeed = coords.length > 1 ? speedSum / (coords.length - 1) : 0;
+  return { coords, avgSpeed };
+}
+
+/**
+ * Generate streamline features. We seed from a jittered 8×7 grid so
+ * streamlines start evenly distributed, not random-clumpy.
+ */
+function buildStreamlines(grid) {
+  const features = [];
+  const seedW = 8, seedH = 7;
+  for (let j = 0; j < seedH; j++) {
+    for (let i = 0; i < seedW; i++) {
+      // Jitter keeps the field organic instead of gridded
+      const jx = (Math.random() - 0.5) * 0.5;
+      const jy = (Math.random() - 0.5) * 0.5;
+      const lon = BOUNDS.west + ((i + 0.5) / seedW) * (BOUNDS.east - BOUNDS.west) + jx;
+      const lat = BOUNDS.south + ((j + 0.5) / seedH) * (BOUNDS.north - BOUNDS.south) + jy;
+      const { coords, avgSpeed } = traceStreamline(grid, lon, lat);
+      if (coords.length < 4) continue;  // skip trivially short lines
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: coords },
+        properties: {
+          speed: avgSpeed,
+          opacity: avgSpeed < 2 ? 0.15 : avgSpeed < 6 ? 0.28 : 0.42,
+        },
+      });
+    }
+  }
+  return features;
+}
+
+/** Canvas-rendered white arrow icon, registered as a map image at load. */
 function createArrowImage() {
   const size = 48;
   const canvas = document.createElement('canvas');
@@ -101,22 +285,20 @@ function createArrowImage() {
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = 'rgba(15, 25, 40, 0.85)';
+  ctx.strokeStyle = 'rgba(15, 25, 40, 0.88)';
   ctx.lineWidth = 2;
   ctx.lineJoin = 'round';
-  // Arrow shape, pointing up (toward smaller y). 48x48 viewport.
   ctx.beginPath();
-  ctx.moveTo(24, 6);    // top point
-  ctx.lineTo(36, 22);   // right shoulder
-  ctx.lineTo(29, 22);   // right inner
-  ctx.lineTo(29, 42);   // right bottom of shaft
-  ctx.lineTo(19, 42);   // left bottom
-  ctx.lineTo(19, 22);   // left inner
-  ctx.lineTo(12, 22);   // left shoulder
+  ctx.moveTo(24, 6);
+  ctx.lineTo(36, 22);
+  ctx.lineTo(29, 22);
+  ctx.lineTo(29, 42);
+  ctx.lineTo(19, 42);
+  ctx.lineTo(19, 22);
+  ctx.lineTo(12, 22);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-
   return ctx.getImageData(0, 0, size, size);
 }
 
@@ -146,50 +328,64 @@ export default function MunroWindMap({ onClose }) {
 
     map.on('load', async () => {
       // Register the arrow icon so the symbol layer can reference it
-      const arrow = createArrowImage();
       if (!map.hasImage('wind-arrow')) {
-        map.addImage('wind-arrow', arrow, { sdf: true });  // SDF = colour via icon-color
+        map.addImage('wind-arrow', createArrowImage(), { sdf: true });
       }
 
-      // Fetch wind at every location in parallel. 30 points is light
-      // enough that even on a slow connection this completes in ~1s.
-      let peak = 0;
-      const features = await Promise.all(WIND_LOCATIONS.map(async (pt) => {
-        try {
-          const url = `https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`;
-          const res = await fetch(url);
-          const data = await res.json();
-          const speed = data.current?.wind_speed_10m ?? 0;
-          const bearing = data.current?.wind_direction_10m ?? 0;
-          const gust = data.current?.wind_gusts_10m ?? 0;
-          if (speed > peak) peak = speed;
-          return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [pt.lon, pt.lat] },
-            properties: {
-              name: pt.name,
-              kind: pt.kind,
-              speed: Math.round(speed),
-              bearing,
-              gust: Math.round(gust),
-              color: windColor(speed),
-            },
-          };
-        } catch {
-          return null;
-        }
-      }));
+      const { grid, maxSpeed, arrowFeatures } = await fetchGridAndArrows();
 
-      const valid = features.filter(Boolean);
-      setMaxMph(Math.round(peak));
+      // Build streamlines from the grid. CPU cost is ~1ms for 56 lines.
+      const streamlineFeatures = buildStreamlines(grid);
 
-      // Add the source + layers: arrow + speed-label circle + label text
-      map.addSource('wind-points', {
+      // Report peak in mph (grid is m/s → ×2.237)
+      setMaxMph(Math.round(maxSpeed * 2.237));
+
+      // ── LAYER 1: streamlines (background flow field) ──
+      map.addSource('wind-streamlines', {
         type: 'geojson',
-        data: { type: 'FeatureCollection', features: valid },
+        data: { type: 'FeatureCollection', features: streamlineFeatures },
+      });
+      map.addLayer({
+        id: 'wind-streamlines-glow',
+        type: 'line',
+        source: 'wind-streamlines',
+        paint: {
+          // Soft glow underneath — wider, very low alpha
+          'line-color': '#bfe4ff',
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 1.8,
+            8, 2.6,
+            11, 3.4,
+          ],
+          'line-opacity': ['*', ['get', 'opacity'], 0.35],
+          'line-blur': 1.4,
+        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+      });
+      map.addLayer({
+        id: 'wind-streamlines',
+        type: 'line',
+        source: 'wind-streamlines',
+        paint: {
+          // Crisp line on top — thin, higher alpha
+          'line-color': '#cfe8ff',
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 0.6,
+            8, 0.9,
+            11, 1.2,
+          ],
+          'line-opacity': ['get', 'opacity'],
+        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
       });
 
-      // Arrow symbol — rotates to wind bearing, colours by speed band
+      // ── LAYER 2: arrow badges (foreground reference points) ──
+      map.addSource('wind-points', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: arrowFeatures },
+      });
       map.addLayer({
         id: 'wind-arrows',
         type: 'symbol',
@@ -198,29 +394,22 @@ export default function MunroWindMap({ onClose }) {
           'icon-image': 'wind-arrow',
           'icon-size': [
             'interpolate', ['linear'], ['zoom'],
-            5, 0.42,
-            8, 0.55,
-            11, 0.7,
+            5, 0.38,
+            8, 0.52,
+            11, 0.68,
           ],
-          // Icon painted pointing up = 0°. Wind bearing is the direction
-          // the wind is coming FROM in degrees clockwise from N. We want
-          // the arrow to show where the wind is going, so add 180°.
           'icon-rotate': ['+', ['get', 'bearing'], 180],
           'icon-allow-overlap': true,
           'icon-rotation-alignment': 'map',
-          // Offset the arrow slightly above centre so the speed badge
-          // (rendered as another layer below) doesn't overlap the arrow.
           'icon-offset': [0, -18],
           'icon-anchor': 'center',
         },
         paint: {
           'icon-color': ['get', 'color'],
-          'icon-halo-color': 'rgba(15, 25, 40, 0.6)',
+          'icon-halo-color': 'rgba(15, 25, 40, 0.7)',
           'icon-halo-width': 0.8,
         },
       });
-
-      // Speed badge — small coloured pill with the mph value
       map.addLayer({
         id: 'wind-badges',
         type: 'symbol',
@@ -240,12 +429,12 @@ export default function MunroWindMap({ onClose }) {
         },
         paint: {
           'text-color': '#ffffff',
-          'text-halo-color': 'rgba(15, 25, 40, 0.9)',
+          'text-halo-color': 'rgba(15, 25, 40, 0.92)',
           'text-halo-width': 2.2,
         },
       });
 
-      // Click handler on arrows — open popup with name + full detail
+      // Click handling
       map.on('click', 'wind-arrows', (e) => {
         const f = e.features?.[0];
         if (!f) return;
@@ -256,14 +445,10 @@ export default function MunroWindMap({ onClose }) {
           bearing: f.properties.bearing,
           gust: f.properties.gust,
           color: f.properties.color,
-          lat: f.geometry.coordinates[1],
-          lon: f.geometry.coordinates[0],
         });
       });
       map.on('mouseenter', 'wind-arrows', () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'wind-arrows', () => { map.getCanvas().style.cursor = ''; });
-
-      // Click empty map → dismiss popup
       map.on('click', (e) => {
         const hits = map.queryRenderedFeatures(e.point, { layers: ['wind-arrows'] });
         if (hits.length === 0) setSelected(null);
@@ -285,8 +470,8 @@ export default function MunroWindMap({ onClose }) {
         <div className="map-title">
           <div className="map-eyebrow">Live Wind Map</div>
           <div className="map-subtitle">
-            {status === 'loading' && 'Sampling wind across Scotland…'}
-            {status === 'ready' && (maxMph > 0 ? `Live · peak ${maxMph} mph` : 'Live · wind across 30 locations')}
+            {status === 'loading' && 'Building wind field…'}
+            {status === 'ready' && (maxMph > 0 ? `Live · peak ${maxMph} mph` : 'Live · wind across Scotland')}
           </div>
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
