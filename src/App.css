@@ -1246,8 +1246,27 @@ button { font-family: inherit; }
 /* ── WalkHighlands route link card ──────────────────────────────────
    Styled consistently with the other glass panels. Body row shows
    a boots emoji + heading + subhead. A distinct CTA button links out. */
+/* ─── Consistent section styling for all cards ─────────────────────── */
+.section {
+  margin-top: 26px;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  padding-left: 2px;
+}
+
 .walkhighlands-card {
-  padding: 14px 16px;
+  padding: 16px 18px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
