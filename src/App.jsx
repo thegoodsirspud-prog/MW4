@@ -29,6 +29,70 @@ const GAUGE_CIRC = 119.4;
 // Unique regions for filter chips
 const REGIONS = [...new Set(MUNROS.map(m => m.region))].sort();
 
+// Add this helper function near the top after imports (around line 32)
+
+// ════════════════════════════════════════════════════════════════[...]
+// Batch Weather Fetching + Caching Service
+// ════════════════════════════════════════════════════════════════[...]
+const CACHE_KEY_PREFIX = 'munro-weather-';
+const getCacheKey = (munroName, date) => `${CACHE_KEY_PREFIX}${munroName}-${date}`;
+
+const getCachedWeather = (munroName) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const key = getCacheKey(munroName, today);
+    const cached = localStorage.getItem(key);
+    return cached ? JSON.parse(cached) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const setCachedWeather = (munroName, data) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const key = getCacheKey(munroName, today);
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    // Silent fail on storage errors
+  }
+};
+
+// Batch-fetch weather for multiple Munros with concurrency limit
+const fetchWeatherBatch = async (munroList) => {
+  const BATCH_SIZE = 5; // Max 5 concurrent requests
+  const result = {};
+  
+  for (let i = 0; i < munroList.length; i += BATCH_SIZE) {
+    const batch = munroList.slice(i, i + BATCH_SIZE);
+    const promises = batch.map(m => {
+      const cached = getCachedWeather(m.name);
+      if (cached) return Promise.resolve(cached);
+      return fetchWeather(m).catch(() => null);
+    });
+    
+    const batchResults = await Promise.all(promises);
+    batchResults.forEach((data, idx) => {
+      if (data) {
+        const munroName = batch[idx].name;
+        result[munroName] = data;
+        setCachedWeather(munroName, data);
+      }
+    });
+  }
+  
+  return result;
+};
+
+// Debounce helper
+const createDebounce = (func, delay) => {
+  let timeoutId = null;
+  return (...args) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
 // ────────────────────────────────────────────────────────────────────────────
 // Utility helpers
 // ────────────────────────────────────────────────────────────────────────────
@@ -934,7 +998,9 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
   const [selectedMode, setSelectedMode] = useState('current');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [useFahrenheit, setUseFahrenheit] = useState(false);
-
+  // Weather cache state
+  const [riskByNameCache, setRiskByNameCache] = useState({});
+  
   // Navigation
   const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState('home'); // home | peaks | map | wind
@@ -969,7 +1035,30 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
     });
     return () => { cancelled = true; };
   }, [munro]);
-
+  
+  // Batch-fetch all 282 Munros once per app session
+  const batchFetchRef = useRef(false);
+  useEffect(() => {
+    if (batchFetchRef.current) return; // Only run once
+    batchFetchRef.current = true;
+    
+    let cancelled = false;
+    fetchWeatherBatch(MUNROS).then(batchData => {
+      if (!cancelled) {
+        const riskMap = {};
+        Object.entries(batchData).forEach(([name, data]) => {
+          if (data && data.current) {
+            const risk = calcRisk(data.current);
+            riskMap[name] = risk.riskColor;
+          }
+        });
+        setRiskByNameCache(riskMap);
+      }
+    });
+    
+    return () => { cancelled = true; };
+  }, []);
+  
   const currentView = useMemo(() => buildCurrentView(wx), [wx]);
   const dailyViews = useMemo(() => buildDailyViews(wx), [wx]);
   const hourlyViews = useMemo(() => buildHourlyViews(wx), [wx]);
@@ -1026,16 +1115,13 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 
   // ────── Map views
   if (page === 'map') {
-    // Colour each peak by current risk where we have it. Without fetching
-    // all 282 peaks' forecasts, we colour the selected peak with its real
-    // risk and leave the rest with a consistent neutral accent blue. As
-    // the user taps around, the selected one reveals its true risk.
-    const riskByName = {};
+    // Use cached risk data for all peaks
+    const riskByName = riskByNameCache;
     if (activeView?.risk?.riskColor && munro?.name) {
       riskByName[munro.name] = activeView.risk.riskColor;
     }
     return (
-      <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading map…</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close map">✕</button></div></div>}>
+      <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading...</div></div></div></div>}>
         <MunroTileMap
           onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
           selectedMunro={munro}
@@ -1316,7 +1402,7 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
                   <text x="11" y="44" fill="rgba(245, 245, 247, 0.55)" fontSize="8.5" fontWeight="700" textAnchor="middle">W</text>
                   {/* Arrow points FROM — meteorological convention. The
                       bearing IS the FROM direction, so rotate directly. */}
-                  <g style={{ transform: `rotate(${activeView.bearing || 0}deg)`, transformOrigin: '41px 41px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
+                 <g style={{ transform: `rotate(${(activeView.bearing + 180) % 360 || 0}deg)`, transformOrigin: '41px 41px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
                     <path
                       d="M41 13 L48 38 L41 34 L34 38 Z"
                       fill="#60a5fa"
@@ -1366,14 +1452,18 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
           </div>
         </section>
 
-        {/* RISK HUB — Overall + Mountain + Midge */}
-        <div ref={riskHubRef}>
-          <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} midgeRef={midgeRef} />
-        </div>
+         {/* RISK HUB — Overall + Mountain + Midge */}
+         <div ref={riskHubRef}>
+           <section className="section">
+             <h2 className="section-title"><span>Mountain Safety · Ascent Rating</span></h2>
+             <RiskHub activeView={activeView} midge={midge} unitF={useFahrenheit} midgeRef={midgeRef} />
+           </section>
+         </div>
 
-        {/* WALKHIGHLANDS — route link for the current peak */}
-        <section className="section">
-          <div className="walkhighlands-card glass">
+         {/* WALKHIGHLANDS — route link for the current peak */}
+         <section className="section">
+           <h2 className="section-title"><span>Walking Routes</span></h2>
+           <div className="walkhighlands-card glass">
             <div className="walkhighlands-body">
               <div className="walkhighlands-icon" aria-hidden="true">🥾</div>
               <div className="walkhighlands-text">
