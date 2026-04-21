@@ -374,6 +374,44 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
       </div>
+             {/* SEARCH BAR */}
+       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+         <div style={{ position: 'relative' }}>
+           <input
+             className="search-input"
+             placeholder="Search 282 Munros..."
+             value={search}
+             onChange={(e) => handleSearch(e.target.value)}
+             style={{ width: '100%' }}
+           />
+           {search && (
+             <>
+               <button 
+                 className="search-clear"
+                 onClick={() => { setSearch(''); setSearchResults([]); }}
+                 style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }}
+               >✕</button>
+               {searchResults.length > 0 && (
+                 <div className="search-results glass" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 11, maxHeight: '250px', overflowY: 'auto' }}>
+                   {searchResults.map(m => (
+                     <button
+                       key={m.name}
+                       className="search-item"
+                       onClick={() => { onSelectMunro(m); setSearch(''); setSearchResults([]); }}
+                       style={{ width: '100%', padding: '10px 12px', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+                     >
+                       <div style={{ fontSize: '13px', fontWeight: 500 }}>{m.name}</div>
+                       <div style={{ fontSize: '10.5px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{m.h}m · {m.region}</div>
+                     </button>
+                   ))}
+                 </div>
+               )}
+             </>
+           )}
+         </div>
+       </div>
+
+       <div ref={containerRef} className="tile-map-viewport">
       <div ref={containerRef} className="tile-map-viewport">
         <div className="tile-map-controls">
           <button
