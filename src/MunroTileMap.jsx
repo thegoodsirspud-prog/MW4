@@ -14,6 +14,13 @@ import { RISK_COLORS } from './risk.js';
  * When the user picks a peak and we have the real forecast, the
  * app-level riskByName overrides this proxy for that peak.
  */
+function heightRiskColor(h) {
+  if (h < 945) return RISK_COLORS[0];  // green — lowest quintile
+  if (h < 981) return RISK_COLORS[1];  // yellow
+  if (h < 1019) return RISK_COLORS[2]; // orange
+  if (h < 1084) return RISK_COLORS[3]; // red
+  return RISK_COLORS[4];               // deep red — top quintile (>= 1084m)
+}
 
 /**
  * MunroTileMap
@@ -55,22 +62,6 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
   // peak's name, region, elevation, and risk colour so the GL style can
   // paint it without React rerenders. Default colour uses the elevation
   // proxy; real forecast data (if available via riskByName) overrides.
-    const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-
-  // Search handler
-  const handleSearch = useCallback((term) => {
-    setSearch(term);
-    if (term.trim()) {
-      const q = term.toLowerCase();
-      const results = MUNROS.filter(m => 
-        m.name.toLowerCase().includes(q) || m.region.toLowerCase().includes(q)
-      ).slice(0, 8);
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
-    }
-  }, []);
   const featureCollection = {
     type: 'FeatureCollection',
     features: MUNROS.map((m) => ({
@@ -84,20 +75,7 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
       },
     })),
   };
-  const featureCollection = useMemo(() => ({
-    type: 'FeatureCollection',
-    features: MUNROS.map((m) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [m.lon, m.lat] },
-      properties: {
-        name: m.name,
-        region: m.region,
-        h: m.h,
-        color: riskByName[m.name] || '#8b8b8b', // Neutral gray for unmeasured peaks
-      },
-    })),
-  }), [riskByName]);
-  
+
   // Initialise the map once. The style URL is CARTO's public dark-matter
   // vector basemap — unlimited use under their attribution-only licence.
   useEffect(() => {
@@ -395,44 +373,7 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
           </div>
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
-      </div>       {/* SEARCH BAR */}
-       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-         <div style={{ position: 'relative' }}>
-           <input
-             className="search-input"
-             placeholder="Search 282 Munros..."
-             value={search}
-             onChange={(e) => handleSearch(e.target.value)}
-             style={{ width: '100%' }}
-           />
-           {search && (
-             <>
-               <button 
-                 className="search-clear"
-                 onClick={() => { setSearch(''); setSearchResults([]); }}
-                 style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }}
-               >✕</button>
-               {searchResults.length > 0 && (
-                 <div className="search-results glass" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 11, maxHeight: '250px', overflowY: 'auto' }}>
-                   {searchResults.map(m => (
-                     <button
-                       key={m.name}
-                       className="search-item"
-                       onClick={() => { onSelectMunro(m); setSearch(''); setSearchResults([]); }}
-                       style={{ width: '100%', padding: '10px 12px', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer' }}
-                     >
-                       <div style={{ fontSize: '13px', fontWeight: 500 }}>{m.name}</div>
-                       <div style={{ fontSize: '10.5px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{m.h}m · {m.region}</div>
-                     </button>
-                   ))}
-                 </div>
-               )}
-             </>
-           )}
-         </div>
-       </div>
-
-       <div ref={containerRef} className="tile-map-viewport">
+      </div>
       <div ref={containerRef} className="tile-map-viewport">
         <div className="tile-map-controls">
           <button
