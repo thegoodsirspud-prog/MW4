@@ -14,13 +14,6 @@ import { RISK_COLORS } from './risk.js';
  * When the user picks a peak and we have the real forecast, the
  * app-level riskByName overrides this proxy for that peak.
  */
-function heightRiskColor(h) {
-  if (h < 945) return RISK_COLORS[0];  // green — lowest quintile
-  if (h < 981) return RISK_COLORS[1];  // yellow
-  if (h < 1019) return RISK_COLORS[2]; // orange
-  if (h < 1084) return RISK_COLORS[3]; // red
-  return RISK_COLORS[4];               // deep red — top quintile (>= 1084m)
-}
 
 /**
  * MunroTileMap
@@ -62,6 +55,22 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
   // peak's name, region, elevation, and risk colour so the GL style can
   // paint it without React rerenders. Default colour uses the elevation
   // proxy; real forecast data (if available via riskByName) overrides.
+    const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+
+  // Search handler
+  const handleSearch = useCallback((term) => {
+    setSearch(term);
+    if (term.trim()) {
+      const q = term.toLowerCase();
+      const results = MUNROS.filter(m => 
+        m.name.toLowerCase().includes(q) || m.region.toLowerCase().includes(q)
+      ).slice(0, 8);
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, []);
   const featureCollection = {
     type: 'FeatureCollection',
     features: MUNROS.map((m) => ({
@@ -75,7 +84,20 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
       },
     })),
   };
-
+  const featureCollection = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: MUNROS.map((m) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [m.lon, m.lat] },
+      properties: {
+        name: m.name,
+        region: m.region,
+        h: m.h,
+        color: riskByName[m.name] || '#8b8b8b', // Neutral gray for unmeasured peaks
+      },
+    })),
+  }), [riskByName]);
+  
   // Initialise the map once. The style URL is CARTO's public dark-matter
   // vector basemap — unlimited use under their attribution-only licence.
   useEffect(() => {
@@ -373,8 +395,7 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose, ri
           </div>
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
-      </div>
-             {/* SEARCH BAR */}
+      </div>       {/* SEARCH BAR */}
        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
          <div style={{ position: 'relative' }}>
            <input
