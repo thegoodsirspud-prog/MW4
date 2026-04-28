@@ -299,10 +299,10 @@ export default function MunroHero({
                 <line x1="20" y1="33" x2="20" y2="36" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
                 <line x1="4"  y1="20" x2="7"  y2="20" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
                 <line x1="33" y1="20" x2="36" y2="20" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1" />
-                {/* Compass arrow points FROM (meteorological convention).
-                    The wind bearing IS the FROM direction, so rotate directly
-                    without the +180 we used for flow arrows elsewhere. */}
-                <g style={{ transform: `rotate(${view.bearing || 0}deg)`, transformOrigin: '20px 20px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
+                {/* Arrow points TO — shows where the wind is going,
+                    matching the conditions card and user expectation.
+                    bearing is the FROM direction, so +180 gives the TO. */}
+                <g style={{ transform: `rotate(${(view.bearing + 180) % 360 || 0}deg)`, transformOrigin: '20px 20px', transition: 'transform 0.6s cubic-bezier(.4,0,.2,1)' }}>
                   <path
                     d="M20 7 L23.6 18 L20 16 L16.4 18 Z"
                     fill="#60a5fa"

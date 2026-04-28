@@ -767,16 +767,12 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
   if (page === 'map') {
     // Provide at least the active peak's risk colour for its map dot.
     // Full batch-fetch removed; tile map handles lazy risk colouring.
-    const riskByName = activeView?.risk?.riskColor && munro?.name
-      ? { [munro.name]: activeView.risk.riskColor }
-      : {};
     return (
       <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading...</div></div></div></div>}>
         <MunroTileMap
           onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
           selectedMunro={munro}
           onClose={() => setPage('home')}
-          riskByName={riskByName}
         />
       </Suspense>
     );
