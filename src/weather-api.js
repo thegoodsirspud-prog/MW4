@@ -34,6 +34,7 @@ const HOURLY_FIELDS = [
   'relative_humidity_2m',
   'precipitation_probability',
   'visibility',
+  'surface_pressure',
 ].join(',');
 
 const DAILY_FIELDS = [
@@ -49,13 +50,39 @@ const DAILY_FIELDS = [
   'sunset',
 ].join(',');
 
-// In-memory cache, keyed by peak name — weather is stable enough to cache
-// for the length of a session. Vercel serves from edge so re-fetches are cheap.
+// ─── Cache layer ─────────────────────────────────────────────────────────────
+// L1: session memory Map  — fastest, gone on page close
+// L2: localStorage        — survives refresh; auto-expires when date changes
+//
+// Key format: mw4-wx-<MunroName>
+// Value:      JSON { date: "YYYY-MM-DD", data: <API response> }
+// Expiry:     lazy — stale if stored date ≠ today (no cron/TTL needed)
 const cache = new Map();
+
+const _today = () => new Date().toISOString().slice(0, 10);
+
+function lsGet(name) {
+  try {
+    const raw = localStorage.getItem('mw4-wx-' + name);
+    if (!raw) return null;
+    const { date, data } = JSON.parse(raw);
+    return date === _today() ? data : null;
+  } catch { return null; }
+}
+
+function lsSet(name, data) {
+  try {
+    localStorage.setItem('mw4-wx-' + name, JSON.stringify({ date: _today(), data }));
+  } catch { /* storage quota — silent fail */ }
+}
 
 export async function fetchWeather(munro) {
   const key = munro.name;
+  // L1: session memory
   if (cache.has(key)) return cache.get(key);
+  // L2: localStorage (same-day cache survives refresh)
+  const lsCached = lsGet(key);
+  if (lsCached) { cache.set(key, lsCached); return lsCached; }
 
   const params = new URLSearchParams({
     latitude: munro.lat,
@@ -78,6 +105,7 @@ export async function fetchWeather(munro) {
       throw new Error('Invalid API response');
     }
     cache.set(key, data);
+    lsSet(key, data);
     return data;
   } catch (err) {
     console.error('[MW4] Weather fetch failed:', err);

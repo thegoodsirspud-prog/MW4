@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, useId } from 'react';
 import { MUNROS } from './munros.js';
 import { lookupWMO } from './weather-codes.js';
 import { fetchWeather } from './weather-api.js';
@@ -16,7 +16,6 @@ import MunroHero from './MunroHero.jsx';
 // page stays tiny. Only users who open /map pay the download cost.
 const MunroTileMap = lazy(() => import('./MunroTileMap.jsx'));
 const MunroWindMap = lazy(() => import('./MunroWindMap.jsx'));
-const BestPeakToday = lazy(() => import('./BestPeakToday.jsx'));
 import './App.css';
 import './MunroHero.css';
 
@@ -29,69 +28,17 @@ const GAUGE_CIRC = 119.4;
 // Unique regions for filter chips
 const REGIONS = [...new Set(MUNROS.map(m => m.region))].sort();
 
-// Add this helper function near the top after imports (around line 32)
-
-// ════════════════════════════════════════════════════════════════[...]
-// Batch Weather Fetching + Caching Service
-// ════════════════════════════════════════════════════════════════[...]
-const CACHE_KEY_PREFIX = 'munro-weather-';
-const getCacheKey = (munroName, date) => `${CACHE_KEY_PREFIX}${munroName}-${date}`;
-
-const getCachedWeather = (munroName) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const key = getCacheKey(munroName, today);
-    const cached = localStorage.getItem(key);
-    return cached ? JSON.parse(cached) : null;
-  } catch (e) {
-    return null;
+// ─── Daily featured Munro ────────────────────────────────────────────────────
+// Same peak all day; rotates at midnight. Deterministic hash of date string
+// so every device shows the same mountain on the same day.
+function getDailyMunro(munros) {
+  const dateStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = (hash * 31 + dateStr.charCodeAt(i)) & 0xffff;
   }
-};
-
-const setCachedWeather = (munroName, data) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const key = getCacheKey(munroName, today);
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    // Silent fail on storage errors
-  }
-};
-
-// Batch-fetch weather for multiple Munros with concurrency limit
-const fetchWeatherBatch = async (munroList) => {
-  const BATCH_SIZE = 5; // Max 5 concurrent requests
-  const result = {};
-  
-  for (let i = 0; i < munroList.length; i += BATCH_SIZE) {
-    const batch = munroList.slice(i, i + BATCH_SIZE);
-    const promises = batch.map(m => {
-      const cached = getCachedWeather(m.name);
-      if (cached) return Promise.resolve(cached);
-      return fetchWeather(m).catch(() => null);
-    });
-    
-    const batchResults = await Promise.all(promises);
-    batchResults.forEach((data, idx) => {
-      if (data) {
-        const munroName = batch[idx].name;
-        result[munroName] = data;
-        setCachedWeather(munroName, data);
-      }
-    });
-  }
-  
-  return result;
-};
-
-// Debounce helper
-const createDebounce = (func, delay) => {
-  let timeoutId = null;
-  return (...args) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-};
+  return munros[hash % munros.length];
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Utility helpers
@@ -107,7 +54,9 @@ const formatHour = (iso) => {
 };
 
 const formatDay = (iso) => {
-  const d = new Date(iso), today = new Date();
+  // Append local noon to avoid UTC-midnight parsing (date-only ISO = UTC,
+  // which in BST shifts the day back by 1h and gives wrong toDateString).
+  const d = new Date(iso + 'T12:00:00'), today = new Date();
   if (d.toDateString() === today.toDateString()) return 'Today';
   const tmrw = new Date(today); tmrw.setDate(today.getDate() + 1);
   if (d.toDateString() === tmrw.toDateString()) return 'Tmrw';
@@ -140,7 +89,10 @@ const precipLabel = (p) =>
 // ────────────────────────────────────────────────────────────────────────────
 // WeatherIcon — hand-built SVG per sky type
 // ────────────────────────────────────────────────────────────────────────────
+// useId() gives each instance a unique ID so SVG <mask> elements don't
+// collide when the hourly strip renders 12 icons at the same size.
 function WeatherIcon({ type, size = 20, night = false }) {
+  const uid = useId();
   const attrs = {
     viewBox: '0 0 20 20', width: size, height: size,
     fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
@@ -152,12 +104,12 @@ function WeatherIcon({ type, size = 20, night = false }) {
     if (night) return (
       <svg {...attrs}>
         <defs>
-          <mask id={`moon-mask-${size}`}>
+          <mask id={`moon-mask-${uid}`}>
             <rect width="20" height="20" fill="white" />
             <circle cx="13" cy="8" r="5" fill="black" />
           </mask>
         </defs>
-        <circle cx="10" cy="10" r="5.5" fill="#dce6f5" stroke="#dce6f5" mask={`url(#moon-mask-${size})`} />
+        <circle cx="10" cy="10" r="5.5" fill="#dce6f5" stroke="#dce6f5" mask={`url(#moon-mask-${uid})`} />
       </svg>
     );
     return (
@@ -175,12 +127,12 @@ function WeatherIcon({ type, size = 20, night = false }) {
     if (night) return (
       <svg {...attrs}>
         <defs>
-          <mask id={`night-cloud-mask-${size}`}>
+          <mask id={`night-cloud-mask-${uid}`}>
             <rect width="20" height="20" fill="white" />
             <circle cx="9" cy="6" r="2.8" fill="black" />
           </mask>
         </defs>
-        <circle cx="6" cy="7" r="3" fill="#dce6f5" mask={`url(#night-cloud-mask-${size})`} />
+        <circle cx="6" cy="7" r="3" fill="#dce6f5" mask={`url(#night-cloud-mask-${uid})`} />
         <path d="M5.5 13 a3 3 0 0 1 .5-5.9 a4 4 0 0 1 7.8.5 a2.5 2.5 0 0 1-.3 5.4Z" fill="rgba(255,255,255,.25)" stroke="rgba(255,255,255,.8)" />
       </svg>
     );
@@ -706,301 +658,21 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Scotland Map — zoomable, all 282 Munros clickable
-// ════════════════════════════════════════════════════════════════════════════
-function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) {
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-  const svgRef = useRef(null);
-
-  // Wind data state for wind map
-  const [windData, setWindData] = useState(null);
-  const [windLoading, setWindLoading] = useState(false);
-
-  useEffect(() => {
-    if (mode !== 'wind') return;
-    let cancelled = false;
-    setWindLoading(true);
-
-    // Sample wind at a 6x8 grid across Scotland for the wind map
-    const gridPoints = [];
-    for (let lat = 56.2; lat <= 58.4; lat += 0.35) {
-      for (let lon = -6.6; lon <= -2.6; lon += 0.6) {
-        gridPoints.push({ lat, lon });
-      }
-    }
-
-    Promise.all(gridPoints.map(async (pt) => {
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=mph&timezone=Europe%2FLondon`;
-        const res = await fetch(url);
-        const data = await res.json();
-        return { ...pt, speed: data.current?.wind_speed_10m ?? 0, dir: data.current?.wind_direction_10m ?? 0 };
-      } catch {
-        return { ...pt, speed: 0, dir: 0 };
-      }
-    })).then(results => {
-      if (!cancelled) {
-        setWindData(results);
-        setWindLoading(false);
-      }
-    });
-
-    return () => { cancelled = true; };
-  }, [mode]);
-
-  const W = 480, H = 640;
-
-  const onPointerDown = (e) => {
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e) => {
-    if (!dragging) return;
-    setPan({
-      x: dragStart.current.panX + (e.clientX - dragStart.current.x),
-      y: dragStart.current.panY + (e.clientY - dragStart.current.y),
-    });
-  };
-  const onPointerUp = (e) => {
-    setDragging(false);
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-  };
-
-  const zoomTo = (factor) => {
-    const newZoom = Math.max(0.8, Math.min(4, zoom * factor));
-    setZoom(newZoom);
-  };
-
-  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-
-  // Wind colour for a given speed (mph)
-  const windColour = (mph) => {
-    if (mph < 10) return '#22c55e';
-    if (mph < 20) return '#84cc16';
-    if (mph < 30) return '#eab308';
-    if (mph < 40) return '#f97316';
-    return '#ef4444';
-  };
-
-  return (
-    <div className="map-overlay">
-      <div className="map-header">
-        <div className="map-title">
-          <div className="map-eyebrow">{mode === 'wind' ? 'Live wind map' : 'Scottish Munros'}</div>
-          <div className="map-subtitle">{mode === 'wind' ? 'Real-time wind across Scotland' : `All ${MUNROS.length} peaks · tap to select`}</div>
-        </div>
-        <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
-      </div>
-
-      <div className="map-viewport"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
-      >
-        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" style={{ display: 'block' }}>
-          <defs>
-            <linearGradient id="terrainGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%"  stopColor="#2d3d2e" />
-              <stop offset="50%" stopColor="#3a4a3b" />
-              <stop offset="100%" stopColor="#2a3a2b" />
-            </linearGradient>
-            <radialGradient id="highlandGrad" cx="50%" cy="50%">
-              <stop offset="0%"  stopColor="rgba(120, 100, 60, 0.4)" />
-              <stop offset="100%" stopColor="rgba(80, 80, 50, 0)" />
-            </radialGradient>
-            <filter id="mapBlur" x="-10%" y="-10%" width="120%" height="120%">
-              <feGaussianBlur stdDeviation="1.5" />
-            </filter>
-          </defs>
-
-          {/* Ocean background */}
-          <rect x="0" y="0" width={W} height={H} fill="url(#oceanGrad)" />
-          <defs>
-            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#0f1c2e" />
-              <stop offset="100%" stopColor="#1a2a3a" />
-            </linearGradient>
-          </defs>
-
-          {/* Graticule — very faint lat/lon grid */}
-          <g opacity="0.08" stroke="#88aacc" strokeWidth="0.3" strokeDasharray="2 3">
-            {[56, 57, 58].map(lat => {
-              const y = projectLatLon(lat, -4.5).y * H;
-              return <line key={`lat-${lat}`} x1="0" y1={y} x2={W} y2={y} />;
-            })}
-            {[-6, -5, -4, -3].map(lon => {
-              const x = projectLatLon(57, lon).x * W;
-              return <line key={`lon-${lon}`} x1={x} y1="0" x2={x} y2={H} />;
-            })}
-          </g>
-
-          {/* Zoom/pan group */}
-          <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom}) translate(${(1 - zoom) * W / (2 * zoom) + pan.x * 0}, ${(1 - zoom) * H / (2 * zoom) + pan.y * 0})`}>
-            <g transform={`translate(${(W / 2) * (1 - 1 / zoom) - pan.x / zoom}, ${(H / 2) * (1 - 1 / zoom) - pan.y / zoom})`} />
-          </g>
-
-          {/* Simpler approach: use transform="scale() translate()" directly */}
-          <g style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '50% 50%' }}>
-            {/* Mainland */}
-            <path d={scotlandOutlinePath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.8" />
-            {/* Highland shading */}
-            <ellipse cx={W * 0.45} cy={H * 0.35} rx={W * 0.28} ry={H * 0.22} fill="url(#highlandGrad)" filter="url(#mapBlur)" />
-            <ellipse cx={W * 0.60} cy={H * 0.48} rx={W * 0.18} ry={H * 0.14} fill="url(#highlandGrad)" filter="url(#mapBlur)" opacity="0.7" />
-
-            {/* Islands */}
-            <path d={skyePath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
-            <path d={mullPath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
-            <path d={hebridesPath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
-            <path d={orkneyPath(W, H)} fill="url(#terrainGrad)" stroke="#5a6a4a" strokeWidth="0.6" />
-
-            {/* Lochs */}
-            {MAJOR_LOCHS.map(loch => {
-              const p = projectLatLon(loch.lat, loch.lon);
-              return (
-                <ellipse key={loch.name}
-                  cx={p.x * W} cy={p.y * H}
-                  rx={8} ry={3}
-                  fill="#3a5a7a" opacity="0.6"
-                  transform={`rotate(30 ${p.x * W} ${p.y * H})`}
-                />
-              );
-            })}
-
-            {/* Region labels */}
-            {MAP_LABELS.map(lbl => {
-              const p = projectLatLon(lbl.lat, lbl.lon);
-              const sz = { lg: 11, md: 9, sm: 7, xs: 6 }[lbl.size];
-              return (
-                <text key={lbl.label}
-                  x={p.x * W} y={p.y * H}
-                  fontSize={sz / zoom}
-                  fill="rgba(255, 255, 255, 0.35)"
-                  textAnchor="middle"
-                  fontWeight="600"
-                  letterSpacing="1.5"
-                  style={{ pointerEvents: 'none', userSelect: 'none' }}
-                >
-                  {lbl.label}
-                </text>
-              );
-            })}
-
-            {/* Wind map mode: live wind vectors */}
-            {mode === 'wind' && windData && windData.map((pt, i) => {
-              const p = projectLatLon(pt.lat, pt.lon);
-              const colour = windColour(pt.speed);
-              const len = Math.min(20, 6 + pt.speed * 0.4);
-              const rad = ((pt.dir + 180) * Math.PI) / 180;
-              const x1 = p.x * W, y1 = p.y * H;
-              const x2 = x1 + Math.sin(rad) * len;
-              const y2 = y1 - Math.cos(rad) * len;
-              return (
-                <g key={i} opacity="0.85">
-                  <line x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke={colour} strokeWidth={1.5 / zoom} strokeLinecap="round" />
-                  <circle cx={x1} cy={y1} r={2 / zoom} fill={colour} />
-                  <text x={x2 + Math.sin(rad) * 4} y={y2 - Math.cos(rad) * 4}
-                    fontSize={7 / zoom} fill={colour} textAnchor="middle"
-                    style={{ pointerEvents: 'none' }}>
-                    {Math.round(pt.speed)}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Munro points */}
-            {mode === 'peaks' && MUNROS.map(m => {
-              const p = projectMunro(m, W, H);
-              const isSelected = selectedMunro && selectedMunro.name === m.name;
-              const r = isSelected ? 6 / zoom : 2.5 / zoom;
-              const strokeW = isSelected ? 1.5 / zoom : 0.5 / zoom;
-              return (
-                <g key={m.name}>
-                  <circle cx={p.x} cy={p.y} r={12 / zoom} fill="transparent"
-                    onClick={() => onSelectMunro(m)}
-                    style={{ cursor: 'pointer' }} />
-                  <circle cx={p.x} cy={p.y} r={r}
-                    fill={isSelected ? '#60a5fa' : '#e4d299'}
-                    stroke={isSelected ? '#fff' : '#8a7a55'}
-                    strokeWidth={strokeW}
-                    style={{ pointerEvents: 'none', transition: 'r 0.2s, fill 0.2s' }} />
-                  {isSelected && (
-                    <text x={p.x} y={p.y - 12 / zoom}
-                      fontSize={11 / zoom} fill="#fff"
-                      textAnchor="middle" fontWeight="600"
-                      style={{ pointerEvents: 'none' }}
-                      filter="url(#textShadow)">
-                      {m.name}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-
-            <defs>
-              <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="black" floodOpacity="0.8" />
-              </filter>
-            </defs>
-          </g>
-        </svg>
-      </div>
-
-      <div className="map-controls">
-        <button onClick={() => zoomTo(1.4)} aria-label="Zoom in">+</button>
-        <button onClick={() => zoomTo(1 / 1.4)} aria-label="Zoom out">−</button>
-        <button onClick={resetView} aria-label="Reset view" className="reset-btn">Reset</button>
-      </div>
-
-      {mode === 'wind' && (
-        <div className="map-legend">
-          <div className="legend-title">Wind speed (mph)</div>
-          <div className="legend-scale">
-            {[
-              { c: '#22c55e', l: '<10' },
-              { c: '#84cc16', l: '10–20' },
-              { c: '#eab308', l: '20–30' },
-              { c: '#f97316', l: '30–40' },
-              { c: '#ef4444', l: '40+' },
-            ].map(s => (
-              <div key={s.l} className="legend-item">
-                <div className="legend-colour" style={{ background: s.c }} />
-                <span>{s.l}</span>
-              </div>
-            ))}
-          </div>
-          {windLoading && <div className="legend-loading">Loading live wind…</div>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // Main App
 // ════════════════════════════════════════════════════════════════════════════
 /*export_default*/ export default function App() {
   const sortedMunros = useMemo(() => [...MUNROS].sort((a, b) => b.h - a.h), []);
   const [munro, setMunro] = useState(() => {
-    // Pick a random Munro on first mount so each refresh is a small
-    // surprise. Stable for the rest of the session because useState's
-    // initialiser only runs once.
-    return sortedMunros[Math.floor(Math.random() * sortedMunros.length)];
+    // Same peak all day — changes at midnight. Every device shows the same
+    // featured Munro for a given calendar date (great for sharing).
+    // Users can still navigate to any peak via search or map.
+    return getDailyMunro(sortedMunros);
   });
   const [wx, setWx] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedMode, setSelectedMode] = useState('current');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [useFahrenheit, setUseFahrenheit] = useState(false);
-  // Weather cache state
-  const [riskByNameCache, setRiskByNameCache] = useState({});
-  
   // Navigation
   const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState('home'); // home | peaks | map | wind
@@ -1036,28 +708,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
     return () => { cancelled = true; };
   }, [munro]);
   
-  // Batch-fetch all 282 Munros once per app session
-  const batchFetchRef = useRef(false);
-  useEffect(() => {
-    if (batchFetchRef.current) return; // Only run once
-    batchFetchRef.current = true;
-    
-    let cancelled = false;
-    fetchWeatherBatch(MUNROS).then(batchData => {
-      if (!cancelled) {
-        const riskMap = {};
-        Object.entries(batchData).forEach(([name, data]) => {
-          if (data && data.current) {
-            const risk = calcRisk(data.current);
-            riskMap[name] = risk.riskColor;
-          }
-        });
-        setRiskByNameCache(riskMap);
-      }
-    });
-    
-    return () => { cancelled = true; };
-  }, []);
   
   const currentView = useMemo(() => buildCurrentView(wx), [wx]);
   const dailyViews = useMemo(() => buildDailyViews(wx), [wx]);
@@ -1115,11 +765,11 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
 
   // ────── Map views
   if (page === 'map') {
-    // Use cached risk data for all peaks
-    const riskByName = riskByNameCache;
-    if (activeView?.risk?.riskColor && munro?.name) {
-      riskByName[munro.name] = activeView.risk.riskColor;
-    }
+    // Provide at least the active peak's risk colour for its map dot.
+    // Full batch-fetch removed; tile map handles lazy risk colouring.
+    const riskByName = activeView?.risk?.riskColor && munro?.name
+      ? { [munro.name]: activeView.risk.riskColor }
+      : {};
     return (
       <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading...</div></div></div></div>}>
         <MunroTileMap
@@ -1135,16 +785,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
     return (
       <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Live Wind Map</div><div className="map-subtitle">Loading…</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close map">✕</button></div></div>}>
         <MunroWindMap onClose={() => setPage('home')} />
-      </Suspense>
-    );
-  }
-  if (page === 'best') {
-    return (
-      <Suspense fallback={<div className="best-peak-overlay"><div className="best-peak-header"><div><div className="best-peak-eyebrow">Today's Recommendations</div><div className="best-peak-title">Best peaks to climb</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close">✕</button></div></div>}>
-        <BestPeakToday
-          onSelectPeak={(m) => { setMunro(m); setPage('home'); }}
-          onClose={() => setPage('home')}
-        />
       </Suspense>
     );
   }
@@ -1231,13 +871,6 @@ function ScotlandMap({ onSelectMunro, selectedMunro, onClose, mode = 'peaks' }) 
               <div>
                 <div className="menu-item-title">Today</div>
                 <div className="menu-item-sub">Current forecast</div>
-              </div>
-            </button>
-            <button className="menu-item menu-item-feature" onClick={() => navTo('best')}>
-              <div className="menu-icon">✨</div>
-              <div>
-                <div className="menu-item-title">Best Peaks Today</div>
-                <div className="menu-item-sub">Live conditions across 28 iconic summits</div>
               </div>
             </button>
             <button className="menu-item" onClick={() => navTo('peaks')}>
