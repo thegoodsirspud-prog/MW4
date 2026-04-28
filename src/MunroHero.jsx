@@ -85,7 +85,7 @@ export default function MunroHero({
     <header
       className="mhero"
     >
-      {/* ── Backdrop: sky + ridges in one scene ──────────────────── */}
+      {/* ── Backdrop: atmospheric sky scene ────────────────────────── */}
       <svg
         className="mhero-scene"
         viewBox="0 0 1000 400"
@@ -93,61 +93,124 @@ export default function MunroHero({
         aria-hidden="true"
       >
         <defs>
-          {/* Sun glow */}
-          <radialGradient id="sun-glow">
-            <stop offset="0%"  stopColor="rgba(255, 235, 180, 0.9)" />
-            <stop offset="40%" stopColor="rgba(255, 215, 140, 0.3)" />
-            <stop offset="100%" stopColor="rgba(255, 200, 120, 0)" />
+          {/* ── Sun system: three-layer corona + bright core ──────── */}
+          <radialGradient id="sun-corona-outer">
+            <stop offset="0%"  stopColor="rgba(255, 225, 160, 0.35)" />
+            <stop offset="35%" stopColor="rgba(255, 210, 140, 0.15)" />
+            <stop offset="70%" stopColor="rgba(255, 200, 120, 0.05)" />
+            <stop offset="100%" stopColor="rgba(255, 190, 100, 0)" />
           </radialGradient>
-          <radialGradient id="moon-glow">
-            <stop offset="0%"  stopColor="rgba(220, 230, 250, 0.85)" />
-            <stop offset="40%" stopColor="rgba(200, 215, 240, 0.15)" />
-            <stop offset="100%" stopColor="rgba(180, 200, 230, 0)" />
+          <radialGradient id="sun-corona-mid">
+            <stop offset="0%"  stopColor="rgba(255, 240, 200, 0.8)" />
+            <stop offset="30%" stopColor="rgba(255, 225, 170, 0.4)" />
+            <stop offset="65%" stopColor="rgba(255, 215, 150, 0.1)" />
+            <stop offset="100%" stopColor="rgba(255, 205, 130, 0)" />
           </radialGradient>
+          <radialGradient id="sun-core">
+            <stop offset="0%"  stopColor="#fffef8" />
+            <stop offset="50%" stopColor="#fff0d0" />
+            <stop offset="80%" stopColor="#ffe8b0" />
+            <stop offset="100%" stopColor="#ffd880" />
+          </radialGradient>
+          {/* ── Moon system: soft blue glow + body + crescent mask ── */}
+          <radialGradient id="moon-outer-glow">
+            <stop offset="0%"  stopColor="rgba(200, 215, 240, 0.5)" />
+            <stop offset="30%" stopColor="rgba(190, 210, 238, 0.2)" />
+            <stop offset="65%" stopColor="rgba(180, 200, 230, 0.06)" />
+            <stop offset="100%" stopColor="rgba(170, 195, 225, 0)" />
+          </radialGradient>
+          <radialGradient id="moon-surface">
+            <stop offset="0%"  stopColor="#e8eef8" />
+            <stop offset="60%" stopColor="#dce4f0" />
+            <stop offset="100%" stopColor="#d0d8e8" />
+          </radialGradient>
+          <mask id="moon-crescent">
+            <rect width="1000" height="400" fill="white" />
+            <circle cx="0" cy="0" r="12" fill="black" id="moon-shadow" />
+          </mask>
+          {/* ── Soft cloud shapes for sky depth ──────────────────── */}
+          <radialGradient id="cloud-soft">
+            <stop offset="0%"  stopColor="rgba(255,255,255,0.18)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0.08)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+          <filter id="cloud-blur">
+            <feGaussianBlur stdDeviation="12" />
+          </filter>
         </defs>
 
-        {/* No sky fill — the page's .sky gradient shows through, so the hero
-            is visually seamless with the rest of the page. Only the sun/moon
-            and stars float on this transparent SVG layer. */}
-
-        {/* Scattered distant stars (night only, clear or snow sky).
-            Hidden on daily previews — they represent a whole day, not a
-            moment, so showing night stars would be misleading. */}
+        {/* Scattered distant stars — night only, clear/snow skies.
+            More stars, varied brightness, subtle twinkling animation. */}
         {!celestial.daytime && !isDailyPreview && (skyType === 'clear' || skyType === 'snow') && (
-          <g opacity="0.7">
+          <g opacity="0.85">
             {[
-              [110, 40], [230, 28], [320, 70], [440, 35], [560, 55],
-              [680, 30], [770, 65], [870, 45], [150, 85], [380, 95],
-              [610, 90], [820, 100], [50, 110], [950, 75],
-            ].map(([x, y], i) => (
-              <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 1.1 : 0.7} fill="#e8eef8">
-                <animate attributeName="opacity" values="0.3;1;0.3" dur={`${3 + (i % 4)}s`} repeatCount="indefinite" />
+              [80, 30, 1.2], [160, 55, 0.8], [240, 22, 1.0], [320, 70, 0.7],
+              [410, 28, 1.1], [480, 82, 0.6], [560, 42, 0.9], [640, 18, 1.3],
+              [720, 65, 0.7], [800, 35, 1.0], [880, 55, 0.8], [940, 25, 0.9],
+              [130, 95, 0.6], [350, 105, 0.7], [530, 92, 0.5], [710, 100, 0.6],
+              [870, 88, 0.8], [50, 110, 0.5], [450, 12, 0.9], [760, 8, 0.7],
+            ].map(([x, y, r], i) => (
+              <circle key={i} cx={x} cy={y} r={r} fill="#dce4f5">
+                <animate attributeName="opacity" values={`${0.2 + (i%4)*0.15};${0.7 + (i%3)*0.1};${0.2 + (i%4)*0.15}`} dur={`${2.5 + (i % 5) * 0.8}s`} repeatCount="indefinite" />
               </circle>
             ))}
           </g>
         )}
 
-        {/* Celestial body — sun or moon. Suppressed on daily previews
-            because a day-summary shouldn't pick a moment to depict. */}
-        {!isDailyPreview && (
+        {/* ── Atmospheric cloud wisps — give the hero sky depth ──── */}
+        {(skyType === 'cloudy' || skyType === 'rain' || skyType === 'storm') && (
+          <g opacity="0.6" filter="url(#cloud-blur)">
+            <ellipse cx="200" cy="120" rx="180" ry="45" fill="url(#cloud-soft)">
+              <animateTransform attributeName="transform" type="translate" values="0,0;30,2;0,0" dur="45s" repeatCount="indefinite" />
+            </ellipse>
+            <ellipse cx="600" cy="80" rx="220" ry="55" fill="url(#cloud-soft)">
+              <animateTransform attributeName="transform" type="translate" values="0,0;-25,3;0,0" dur="55s" repeatCount="indefinite" />
+            </ellipse>
+            <ellipse cx="850" cy="140" rx="160" ry="40" fill="url(#cloud-soft)">
+              <animateTransform attributeName="transform" type="translate" values="0,0;20,-2;0,0" dur="38s" repeatCount="indefinite" />
+            </ellipse>
+          </g>
+        )}
+        {(skyType === 'clear' || skyType === 'snow' || skyType === 'fog') && celestial.daytime && (
+          <g opacity="0.35" filter="url(#cloud-blur)">
+            <ellipse cx="300" cy="100" rx="160" ry="35" fill="url(#cloud-soft)">
+              <animateTransform attributeName="transform" type="translate" values="0,0;35,1;0,0" dur="60s" repeatCount="indefinite" />
+            </ellipse>
+            <ellipse cx="750" cy="130" rx="140" ry="30" fill="url(#cloud-soft)">
+              <animateTransform attributeName="transform" type="translate" values="0,0;-30,2;0,0" dur="50s" repeatCount="indefinite" />
+            </ellipse>
+          </g>
+        )}
+
+        {/* ── Celestial body — rich sun or detailed moon ─────────── */}
+        {!isDailyPreview && celestial.daytime && (
           <g>
-            <circle
-              cx={celestial.cx}
-              cy={celestial.cy}
-              r="90"
-              fill={celestial.daytime ? 'url(#sun-glow)' : 'url(#moon-glow)'}
-              opacity="0.8"
-            />
-            <circle
-              cx={celestial.cx}
-              cy={celestial.cy}
-              r={celestial.daytime ? 18 : 14}
-              fill={celestial.daytime ? '#ffe4a8' : '#dce6f5'}
-              opacity={celestial.daytime ? 0.95 : 0.9}
-            />
-            {!celestial.daytime && (
-              <circle cx={celestial.cx + 5} cy={celestial.cy - 3} r="3.2" fill="rgba(100, 115, 140, 0.5)" />
-            )}
+            {/* Outer corona — very large, very soft warm glow */}
+            <circle cx={celestial.cx} cy={celestial.cy} r="140" fill="url(#sun-corona-outer)" opacity="0.7" />
+            {/* Middle corona — tighter, brighter halo */}
+            <circle cx={celestial.cx} cy={celestial.cy} r="55" fill="url(#sun-corona-mid)" opacity="0.85" />
+            {/* Core — bright white-gold disc */}
+            <circle cx={celestial.cx} cy={celestial.cy} r="22" fill="url(#sun-core)" opacity="0.95" />
+            {/* Subtle lens bloom — horizontal light streak */}
+            <ellipse cx={celestial.cx} cy={celestial.cy} rx="80" ry="3" fill="rgba(255,240,200,0.12)" opacity="0.6">
+              <animate attributeName="rx" values="80;90;80" dur="6s" repeatCount="indefinite" />
+            </ellipse>
+          </g>
+        )}
+        {!isDailyPreview && !celestial.daytime && (
+          <g>
+            {/* Outer glow — large cool-blue aura */}
+            <circle cx={celestial.cx} cy={celestial.cy} r="90" fill="url(#moon-outer-glow)" opacity="0.75" />
+            {/* Moon body with crescent */}
+            <g>
+              <circle cx={celestial.cx} cy={celestial.cy} r="16" fill="url(#moon-surface)" opacity="0.92" />
+              {/* Crescent shadow — offset circle creates the phase */}
+              <circle cx={celestial.cx + 6} cy={celestial.cy - 2} r="13" fill="rgba(20,30,55,0.75)" />
+              {/* Surface craters — subtle marks */}
+              <circle cx={celestial.cx - 5} cy={celestial.cy + 2} r="1.8" fill="rgba(160,175,200,0.4)" />
+              <circle cx={celestial.cx - 2} cy={celestial.cy - 5} r="1.2" fill="rgba(160,175,200,0.3)" />
+              <circle cx={celestial.cx - 7} cy={celestial.cy - 3} r="0.8" fill="rgba(160,175,200,0.25)" />
+            </g>
           </g>
         )}
       </svg>

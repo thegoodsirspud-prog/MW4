@@ -83,12 +83,21 @@ button { font-family: inherit; }
   background: linear-gradient(180deg, #5a7795 0%, #7a94b0 40%, #9ab0c7 70%, #b0c2d4 100%);
   transition: background 1.4s cubic-bezier(.4, 0, .2, 1);
 }
-.app.sky-clear  .sky { background: linear-gradient(180deg, #3d6bb0 0%, #5a8fd8 30%, #8fb4e3 65%, #c4d6ec 100%); }
-.app.sky-cloudy .sky { background: linear-gradient(180deg, #5a7795 0%, #7a94b0 40%, #9ab0c7 70%, #b0c2d4 100%); }
-.app.sky-rain   .sky { background: linear-gradient(180deg, #4a6580 0%, #6a8298 40%, #8a9db0 70%, #a3b3c3 100%); }
-.app.sky-storm  .sky { background: linear-gradient(180deg, #374557 0%, #4c5c72 35%, #677689 65%, #8494a4 100%); }
-.app.sky-snow   .sky { background: linear-gradient(180deg, #5a6e8a 0%, #7a8ca8 30%, #9aadc4 55%, #b4c3d5 75%, #cad5e1 100%); }
-.app.sky-fog    .sky { background: linear-gradient(180deg, #6a7585 0%, #868f9f 40%, #a1aab9 70%, #bec5d0 100%); }
+/* ── Weather-driven sky palettes ──────────────────────────────────────
+   Richer multi-stop gradients with atmospheric depth. Upper sky is deep
+   and saturated; lower sky warms toward the horizon. */
+.app.sky-clear  .sky { background: linear-gradient(180deg,
+  #1e4a8a 0%, #2e6ab8 18%, #4a8cd4 38%, #72aee3 56%, #a3ccea 74%, #d4e6f3 90%, #e8eff6 100%); }
+.app.sky-cloudy .sky { background: linear-gradient(180deg,
+  #4a607a 0%, #607a94 20%, #7a94ad 40%, #94adc2 60%, #aec3d4 78%, #c4d3e0 92%, #d2dde6 100%); }
+.app.sky-rain   .sky { background: linear-gradient(180deg,
+  #3a4d62 0%, #4d6378 18%, #5e7488 38%, #728a9e 56%, #8a9fb2 74%, #a0b2c2 90%, #b0bfcc 100%); }
+.app.sky-storm  .sky { background: linear-gradient(180deg,
+  #262e3e 0%, #343f52 15%, #444f64 32%, #546070 50%, #647280 68%, #778592 84%, #8a95a2 100%); }
+.app.sky-snow   .sky { background: linear-gradient(180deg,
+  #546a82 0%, #6a829a 18%, #8298ae 36%, #9ab0c4 54%, #b0c4d4 72%, #c6d5e0 88%, #d8e2ea 100%); }
+.app.sky-fog    .sky { background: linear-gradient(180deg,
+  #727d8a 0%, #8a949f 20%, #a0a9b3 40%, #b4bcc4 60%, #c6cdd4 78%, #d5dade 90%, #e0e3e6 100%); }
 .sky::after {
   content: '';
   position: absolute;
@@ -98,10 +107,9 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 
-/* ── Time-of-day overlay ───────────────────────────────────────────
-   A second absolutely-positioned layer composited on top of the sky
-   gradient. Uses mix-blend-mode so we modulate brightness/tint rather
-   than replace colour. Combines with any .sky-<weather> class. */
+/* ── Time-of-day overlay ─────────────────────────────────────────────
+   Composited via mix-blend-mode: multiply over the weather sky.
+   Dramatically richer gradients for dawn/dusk/night. */
 .sky::before {
   content: '';
   position: absolute;
@@ -113,54 +121,63 @@ button { font-family: inherit; }
   transition: background 1.4s cubic-bezier(.4, 0, .2, 1);
 }
 
-/* Night 22:00–04:00 — heavy deep-navy multiply turns any daytime sky
-   into a believable night sky. Multiply means midday gradients → navy,
-   but already-dark storm skies stay close to what they were. */
+/* Night 22:00–04:00 — immersive deep navy, almost black at zenith.
+   Stars and moon glow punch through the multiply layer beautifully. */
 .app.time-night .sky::before {
   background: linear-gradient(180deg,
-    rgba(12, 20, 38, 0.88) 0%,
-    rgba(20, 30, 55, 0.78) 50%,
-    rgba(30, 42, 70, 0.68) 100%);
+    rgba(8, 12, 28, 0.94) 0%,
+    rgba(12, 18, 38, 0.90) 25%,
+    rgba(18, 26, 52, 0.82) 50%,
+    rgba(24, 35, 65, 0.72) 75%,
+    rgba(32, 44, 72, 0.60) 100%);
 }
 
-/* Dawn 04:00–06:00 — warm purple-pink horizon band */
+/* Dawn 04:00–06:00 — the sky transitions from deep indigo through
+   rose and warm peach. Horizon band should glow. */
 .app.time-dawn .sky::before {
   background: linear-gradient(180deg,
-    rgba(40, 40, 70, 0.55) 0%,
-    rgba(100, 60, 80, 0.35) 55%,
-    rgba(180, 120, 110, 0.25) 85%,
-    rgba(200, 140, 120, 0.15) 100%);
+    rgba(28, 24, 60, 0.65) 0%,
+    rgba(55, 35, 72, 0.52) 25%,
+    rgba(110, 60, 80, 0.38) 50%,
+    rgba(175, 105, 90, 0.28) 72%,
+    rgba(210, 145, 108, 0.18) 88%,
+    rgba(235, 175, 130, 0.10) 100%);
 }
 
-/* Golden hour 06:00–08:00 and 18:00–20:00 — warm amber overlay */
+/* Golden hour 06:00–08:00 and 18:00–20:00 — warm amber glow. */
 .app.time-golden .sky::before {
   background: linear-gradient(180deg,
-    rgba(100, 90, 120, 0.25) 0%,
-    rgba(180, 140, 120, 0.28) 60%,
-    rgba(220, 170, 130, 0.22) 100%);
+    rgba(90, 75, 110, 0.22) 0%,
+    rgba(140, 105, 100, 0.24) 35%,
+    rgba(190, 145, 110, 0.26) 65%,
+    rgba(220, 175, 125, 0.20) 85%,
+    rgba(240, 195, 140, 0.14) 100%);
 }
 
-/* Morning 08:00–11:00 — slight cool lift, essentially neutral */
+/* Morning 08:00–11:00 — essentially neutral, slight cool lift */
 .app.time-morning .sky::before { background: transparent; }
 
-/* Midday 11:00–17:00 — full brightness, no overlay */
+/* Midday 11:00–17:00 — full brightness */
 .app.time-midday .sky::before { background: transparent; }
 
-/* Evening 17:00–18:00 — slight warm tint */
+/* Evening 17:00–18:00 — gentle warm blush */
 .app.time-evening .sky::before {
   background: linear-gradient(180deg,
-    rgba(80, 75, 105, 0.18) 0%,
-    rgba(160, 130, 120, 0.20) 70%,
-    rgba(190, 150, 130, 0.15) 100%);
+    rgba(75, 68, 100, 0.15) 0%,
+    rgba(135, 110, 105, 0.18) 50%,
+    rgba(185, 148, 122, 0.14) 80%,
+    rgba(205, 165, 135, 0.10) 100%);
 }
 
-/* Dusk 20:00–22:00 — mauve into deep blue */
+/* Dusk 20:00–22:00 — rich purple into deep blue, dramatic */
 .app.time-dusk .sky::before {
   background: linear-gradient(180deg,
-    rgba(25, 30, 55, 0.65) 0%,
-    rgba(60, 50, 85, 0.55) 55%,
-    rgba(110, 80, 100, 0.40) 90%,
-    rgba(130, 90, 100, 0.30) 100%);
+    rgba(18, 22, 48, 0.72) 0%,
+    rgba(38, 32, 68, 0.62) 25%,
+    rgba(68, 48, 85, 0.52) 50%,
+    rgba(105, 72, 95, 0.38) 72%,
+    rgba(140, 95, 100, 0.28) 88%,
+    rgba(160, 110, 105, 0.18) 100%);
 }
 
 /* ─── 4. Weather FX ─────────────────────────────────────────────────────
@@ -189,19 +206,19 @@ button { font-family: inherit; }
 /* Rain: two depth classes driven by JS */
 .wx-rain {
   position: absolute; width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(200, 215, 235, 0.7));
-  transform: rotate(12deg); transform-origin: top;
+  background: linear-gradient(180deg, transparent 0%, rgba(190, 210, 235, 0.5) 40%, rgba(210, 225, 245, 0.75) 100%);
+  transform: rotate(10deg); transform-origin: top;
   animation: wx-raindrop linear infinite;
   will-change: transform, opacity;
 }
 .wx-rain.wx-near {
-  width: 1.5px;
-  background: linear-gradient(180deg, transparent, rgba(220, 230, 245, 0.85));
+  width: 1.8px;
+  background: linear-gradient(180deg, transparent 0%, rgba(200, 218, 240, 0.6) 30%, rgba(225, 238, 252, 0.9) 100%);
 }
 .wx-rain.wx-far {
-  width: 0.5px;
-  background: linear-gradient(180deg, transparent, rgba(180, 195, 215, 0.45));
-  filter: blur(0.4px);
+  width: 0.6px;
+  background: linear-gradient(180deg, transparent 0%, rgba(170, 190, 215, 0.3) 50%, rgba(190, 205, 225, 0.5) 100%);
+  filter: blur(0.5px);
 }
 @keyframes wx-raindrop {
   0%   { transform: translateY(-40px) translateX(0) rotate(12deg); opacity: 0; }
@@ -226,18 +243,20 @@ button { font-family: inherit; }
   100% { transform: translateY(110vh) translateX(var(--drift, 40px)) rotate(360deg); opacity: 0; }
 }
 
-/* Soft volumetric clouds — radial-gradient ellipses rather than blurred circles */
+/* Soft volumetric clouds — multi-layered radial gradients with subtle
+   brightness variation. Wider, more atmospheric, less "blob-like". */
 .wx-cloud {
   position: absolute;
   border-radius: 50%;
   background: radial-gradient(
-    ellipse at center,
-    rgba(255, 255, 255, 0.24) 0%,
-    rgba(255, 255, 255, 0.12) 40%,
-    rgba(255, 255, 255, 0.04) 70%,
+    ellipse at 40% 50%,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.18) 25%,
+    rgba(255, 255, 255, 0.08) 55%,
+    rgba(255, 255, 255, 0.02) 80%,
     transparent 100%
   );
-  filter: blur(6px);
+  filter: blur(8px);
   animation: wx-cloud-drift linear infinite, wx-cloud-bob ease-in-out infinite;
   will-change: transform;
 }
