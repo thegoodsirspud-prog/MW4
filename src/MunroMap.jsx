@@ -36,7 +36,7 @@ const MUNRO_GEO = {
 // ── Wind grid ──────────────────────────────────────────────────────────
 const BOUNDS = { west: -8.0, east: -1.2, south: 55.2, north: 59.2 };
 const GW = 10, GH = 7;
-const PARTICLES = 300, MAX_AGE = 80, SPEED_K = 0.002;
+const PARTICLES = 450, MAX_AGE = 80, SPEED_K = 0.00004, TARGET_MS = 25;
 
 const WIND_LOCS = [
   { name:'Lerwick',lat:60.15,lon:-1.14,k:'town' },{ name:'Kirkwall',lat:58.98,lon:-2.96,k:'town' },
@@ -210,29 +210,41 @@ export default function MunroMap({ onSelectMunro, selectedMunro }) {
     });
   }
 
-  // ── Animation loop ───────────────────────────────────────────────────
+  // ── Animation loop (zero-alloc, delta-time) ─────────────────────────
   function runParticles(map){
     const grid=gridRef.current,parts=partsRef.current;
     if(!grid||!parts)return;
-    let fc=0;
+
+    // Pre-allocate feature store — mutated in-place each frame, no GC jank
+    const store=parts.map(()=>({type:'Feature',geometry:{type:'Point',coordinates:[0,0]},properties:{r:0,o:0,s:0}}));
+    const collection={type:'FeatureCollection',features:[]};
+    let lastT=performance.now();
+
     function tick(){
-      fc++;
-      if(fc%3!==0){animRef.current=requestAnimationFrame(tick);return;}
-      const feats=[];
+      const now=performance.now();
+      const dt=now-lastT;
+      if(dt<TARGET_MS){animRef.current=requestAnimationFrame(tick);return;}
+      lastT=now;
+
+      let n=0;
       for(let i=0;i<parts.length;i++){
         const p=parts[i];p.age++;
         if(p.age>=p.maxAge){parts[i]=mkParticle();continue;}
         const w=sample(grid,p.lon,p.lat);
         if(w.speed<0.3){parts[i]=mkParticle();continue;}
-        p.lon+=w.u*SPEED_K;p.lat+=w.v*SPEED_K;
+        p.lon+=w.u*SPEED_K*dt;p.lat+=w.v*SPEED_K*dt;
         if(p.lon<BOUNDS.west-0.3||p.lon>BOUNDS.east+0.3||p.lat<BOUNDS.south-0.3||p.lat>BOUNDS.north+0.3){parts[i]=mkParticle();continue;}
         const deg=(Math.atan2(w.u,w.v)*180/Math.PI+360)%360;
         const life=p.age/p.maxAge;
         const fade=life<0.12?life/0.12:life>0.8?(1-life)/0.2:1;
         const o=fade*(0.35+Math.min(1,w.speed/10)*0.5);
-        feats.push({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{r:Math.round(deg),o:Math.round(o*100)/100,s:Math.round(w.speed*100)/100}});
+        const f=store[n];
+        f.geometry.coordinates[0]=p.lon;f.geometry.coordinates[1]=p.lat;
+        f.properties.r=Math.round(deg);f.properties.o=Math.round(o*100)/100;f.properties.s=Math.round(w.speed*100)/100;
+        n++;
       }
-      try{map.getSource('flow-src')?.setData({type:'FeatureCollection',features:feats});}catch{}
+      collection.features=store.slice(0,n);
+      try{map.getSource('flow-src')?.setData(collection);}catch{}
       animRef.current=requestAnimationFrame(tick);
     }
     animRef.current=requestAnimationFrame(tick);
