@@ -28,9 +28,13 @@ const MUNRO_GEOJSON = {
   })),
 };
 
-function addMunroLayers(map, theme, selName) {
+function addLayers(map, theme, selName) {
   const t = THEME[theme];
-  if (map.getSource('munros')) return;
+  // Remove old layers/source if they exist (idempotent)
+  ['munros-label','munros-hit','munros-selected','munros-dot','munros-halo'].forEach(id => {
+    try { map.removeLayer(id); } catch {}
+  });
+  try { map.removeSource('munros'); } catch {}
 
   map.addSource('munros', { type: 'geojson', data: MUNRO_GEOJSON });
 
@@ -38,24 +42,20 @@ function addMunroLayers(map, theme, selName) {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 5, 8, 8, 11, 11, 14, 15],
     'circle-color': t.halo, 'circle-opacity': 0.22, 'circle-blur': 0.9,
   }});
-
   map.addLayer({ id: 'munros-dot', type: 'circle', source: 'munros', paint: {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 8, 3.5, 11, 5, 14, 7],
     'circle-color': t.dot, 'circle-stroke-color': t.dotStroke, 'circle-stroke-width': 0.8,
   }});
-
   map.addLayer({ id: 'munros-selected', type: 'circle', source: 'munros',
     filter: ['==', ['get', 'name'], selName || ''], paint: {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 7, 8, 10, 11, 13, 14, 17],
     'circle-color': 'transparent', 'circle-stroke-color': t.ring,
     'circle-stroke-width': 2, 'circle-stroke-opacity': 0.92,
   }});
-
   map.addLayer({ id: 'munros-hit', type: 'circle', source: 'munros', paint: {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 12, 8, 16, 11, 20, 14, 24],
     'circle-color': 'transparent', 'circle-opacity': 0,
   }});
-
   map.addLayer({ id: 'munros-label', type: 'symbol', source: 'munros', minzoom: 9,
     layout: {
       'text-field': ['get', 'name'],
@@ -75,6 +75,8 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
   const [preview, setPreview] = useState(null);
   const [disambig, setDisambig] = useState(null);
   const [isLight, setIsLight] = useState(false);
+  const [ctrlOpen, setCtrlOpen] = useState(false);
+  const themeRef = useRef('dark');
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -88,7 +90,7 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
     map.on('load', () => {
-      addMunroLayers(map, 'dark', selectedMunro?.name);
+      addLayers(map, 'dark', selectedMunro?.name);
 
       map.on('click', (e) => {
         const tol = 22;
@@ -119,17 +121,25 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
-  // Theme toggle — swap style, re-add layers once new style loads
   const toggleTheme = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     const next = isLight ? 'dark' : 'light';
+    themeRef.current = next;
     const center = map.getCenter(), zoom = map.getZoom();
+
+    // Use 'idle' event — fires once map is fully rendered with new style
     map.setStyle(STYLES[next]);
-    map.once('style.load', () => {
-      addMunroLayers(map, next, selectedMunro?.name);
+    const onReady = () => {
+      addLayers(map, next, selectedMunro?.name);
       map.jumpTo({ center, zoom });
-    });
+    };
+    map.once('idle', onReady);
+    // Safety fallback if idle never fires
+    setTimeout(() => {
+      try { if (!map.getSource('munros')) onReady(); } catch {}
+    }, 2000);
+
     setIsLight(!isLight);
   }, [isLight, selectedMunro]);
 
@@ -141,12 +151,12 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
     }
   }, [ready, selectedMunro]);
 
-  const resetView = () => { if (!mapRef.current) return; setPreview(null); mapRef.current.flyTo({ center: [-4.2, 57.0], zoom: 6.2, duration: 700, essential: true }); };
+  const resetView = () => { if (!mapRef.current) return; setPreview(null); setCtrlOpen(false); mapRef.current.flyTo({ center: [-4.2, 57.0], zoom: 6.2, duration: 700, essential: true }); };
 
   const [userPos, setUserPos] = useState(null);
   const [geoError, setGeoError] = useState(null);
   const requestLocation = () => {
-    setGeoError(null);
+    setGeoError(null); setCtrlOpen(false);
     if (!navigator.geolocation) { setGeoError('Location not supported'); setTimeout(() => setGeoError(null), 3000); return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => { const p = { lat: pos.coords.latitude, lon: pos.coords.longitude }; setUserPos(p); mapRef.current?.flyTo({ center: [p.lon, p.lat], zoom: Math.max(9, mapRef.current.getZoom()), duration: 900, essential: true }); },
@@ -171,38 +181,39 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
           <div className="map-eyebrow">Scottish Munros</div>
           <div className="map-subtitle">All {MUNROS.length} peaks · tap to select</div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="tile-map-ctrl" onClick={toggleTheme} aria-label={isLight ? 'Dark map' : 'Light map'} style={{ position: 'static' }}>
-            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-              {isLight
-                ? <path d="M10 3a7 7 0 1 0 0 14 5 5 0 0 1 0-14z" fill="currentColor" />
-                : <><circle cx="10" cy="10" r="3.5" fill="currentColor" />{[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180;return <line key={a} x1={10+Math.cos(r)*5.5} y1={10+Math.sin(r)*5.5} x2={10+Math.cos(r)*7} y2={10+Math.sin(r)*7} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>})}</>
-              }
-            </svg>
-          </button>
-          <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
-        </div>
+        <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
       </div>
       <div ref={containerRef} className="tile-map-viewport">
-        <div className="tile-map-controls">
-          <button className="tile-map-ctrl" onClick={resetView} aria-label="Reset view">
-            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-              <path d="M10 3 L10 7 M3 10 L7 10 M10 13 L10 17 M13 10 L17 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        {/* Unified control pill */}
+        <div className="map-ctrl-wrap">
+          <button className="map-ctrl-toggle" onClick={() => setCtrlOpen(!ctrlOpen)} aria-label="Map controls">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+              <circle cx="4" cy="10" r="1.5" fill="currentColor" />
+              <circle cx="10" cy="10" r="1.5" fill="currentColor" />
+              <circle cx="16" cy="10" r="1.5" fill="currentColor" />
             </svg>
-            <span>Reset</span>
           </button>
-          <button className={`tile-map-ctrl ${userPos ? 'tile-map-ctrl-active' : ''}`} onClick={requestLocation} aria-label="My location">
-            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-              <circle cx="10" cy="10" r="3" fill="currentColor" />
-              <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.5" />
-              <line x1="10" y1="1.5" x2="10" y2="4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <line x1="10" y1="16" x2="10" y2="18.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <line x1="1.5" y1="10" x2="4" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <line x1="16" y1="10" x2="18.5" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            <span>My location</span>
-          </button>
+          {ctrlOpen && (
+            <div className="map-ctrl-menu">
+              <button className="map-ctrl-item" onClick={resetView}>
+                <svg viewBox="0 0 20 20" width="14" height="14"><path d="M10 3 L10 7 M3 10 L7 10 M10 13 L10 17 M13 10 L17 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
+                Reset view
+              </button>
+              <button className="map-ctrl-item" onClick={requestLocation}>
+                <svg viewBox="0 0 20 20" width="14" height="14"><circle cx="10" cy="10" r="3" fill="currentColor" /><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.5" /></svg>
+                My location
+              </button>
+              <button className="map-ctrl-item" onClick={() => { toggleTheme(); setCtrlOpen(false); }}>
+                <svg viewBox="0 0 20 20" width="14" height="14">
+                  {isLight
+                    ? <path d="M10 3a7 7 0 1 0 0 14 5 5 0 0 1 0-14z" fill="currentColor" />
+                    : <><circle cx="10" cy="10" r="3.5" fill="currentColor" />{[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180;return <line key={a} x1={10+Math.cos(r)*5.5} y1={10+Math.sin(r)*5.5} x2={10+Math.cos(r)*7} y2={10+Math.sin(r)*7} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>})}</>
+                  }
+                </svg>
+                {isLight ? 'Dark map' : 'Light map'}
+              </button>
+            </div>
+          )}
         </div>
 
         {geoError && <div className="tile-map-toast" role="status">{geoError}</div>}
