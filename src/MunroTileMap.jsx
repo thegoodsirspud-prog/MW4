@@ -171,7 +171,17 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
           <div className="map-eyebrow">Scottish Munros</div>
           <div className="map-subtitle">All {MUNROS.length} peaks · tap to select</div>
         </div>
-        <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="tile-map-ctrl" onClick={toggleTheme} aria-label={isLight ? 'Dark map' : 'Light map'} style={{ position: 'static' }}>
+            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+              {isLight
+                ? <path d="M10 3a7 7 0 1 0 0 14 5 5 0 0 1 0-14z" fill="currentColor" />
+                : <><circle cx="10" cy="10" r="3.5" fill="currentColor" />{[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180;return <line key={a} x1={10+Math.cos(r)*5.5} y1={10+Math.sin(r)*5.5} x2={10+Math.cos(r)*7} y2={10+Math.sin(r)*7} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>})}</>
+              }
+            </svg>
+          </button>
+          <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
+        </div>
       </div>
       <div ref={containerRef} className="tile-map-viewport">
         <div className="tile-map-controls">
@@ -192,15 +202,6 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
               <line x1="16" y1="10" x2="18.5" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
             <span>My location</span>
-          </button>
-          <button className="tile-map-ctrl" onClick={toggleTheme} aria-label={isLight ? 'Dark map' : 'Light map'}>
-            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-              {isLight
-                ? <path d="M10 3a7 7 0 1 0 0 14 5 5 0 0 1 0-14z" fill="currentColor" />
-                : <><circle cx="10" cy="10" r="3.5" fill="currentColor" />{[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180;return <line key={a} x1={10+Math.cos(r)*5.5} y1={10+Math.sin(r)*5.5} x2={10+Math.cos(r)*7} y2={10+Math.sin(r)*7} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>})}</>
-              }
-            </svg>
-            <span>{isLight ? 'Dark' : 'Light'}</span>
           </button>
         </div>
 

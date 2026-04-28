@@ -864,32 +864,32 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
               <div className="menu-title">Munro Weather</div>
               <button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="Close menu">✕</button>
             </div>
-            <button className="menu-item active" onClick={() => navTo('home')}>
+            <button className={`menu-item ${page === 'home' ? 'menu-item-active' : ''}`} onClick={() => navTo('home')}>
               <div className="menu-icon">🏔️</div>
               <div>
                 <div className="menu-item-title">Today</div>
                 <div className="menu-item-sub">Current forecast</div>
               </div>
             </button>
-            <button className="menu-item" onClick={() => navTo('peaks')}>
+            <button className={`menu-item ${page === 'peaks' ? 'menu-item-active' : ''}`} onClick={() => navTo('peaks')}>
               <div className="menu-icon">🗻</div>
               <div>
                 <div className="menu-item-title">All {sortedMunros.length} Peaks</div>
                 <div className="menu-item-sub">Browse and filter by region</div>
               </div>
             </button>
-            <button className="menu-item" onClick={() => navTo('map')}>
+            <button className={`menu-item ${page === 'map' ? 'menu-item-active' : ''}`} onClick={() => navTo('map')}>
               <div className="menu-icon">🗺️</div>
               <div>
                 <div className="menu-item-title">Munro Map</div>
                 <div className="menu-item-sub">All 282 peaks on Scotland</div>
               </div>
             </button>
-            <button className="menu-item" onClick={() => navTo('wind')}>
+            <button className={`menu-item ${page === 'wind' ? 'menu-item-active' : ''}`} onClick={() => navTo('wind')}>
               <div className="menu-icon">🌬️</div>
               <div>
-                <div className="menu-item-title">Live Wind Map</div>
-                <div className="menu-item-sub">Real-time wind across Scotland</div>
+                <div className="menu-item-title">Live Wind</div>
+                <div className="menu-item-sub">Animated wind across Scotland</div>
               </div>
             </button>
             <div className="menu-footer">
