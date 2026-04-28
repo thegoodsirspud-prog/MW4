@@ -308,6 +308,9 @@ export default function MunroWindMap({ onClose }) {
   const [status, setStatus] = useState('loading');
   const [maxMph, setMaxMph] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [isLight, setIsLight] = useState(false);
+  // Cache fetched data so we can re-add layers after a style swap
+  const windDataRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -336,6 +339,9 @@ export default function MunroWindMap({ onClose }) {
 
       // Build streamlines from the grid. CPU cost is ~1ms for 56 lines.
       const streamlineFeatures = buildStreamlines(grid);
+
+      // Cache for re-adding after theme toggle
+      windDataRef.current = { streamlineFeatures, arrowFeatures };
 
       // Report peak in mph (grid is m/s → ×2.237)
       setMaxMph(Math.round(maxSpeed * 2.237));
@@ -479,6 +485,62 @@ export default function MunroWindMap({ onClose }) {
     };
   }, []);
 
+  const toggleTheme = () => {
+    const map = mapRef.current;
+    if (!map || !windDataRef.current) return;
+    const next = isLight ? 'dark' : 'light';
+    const styleUrl = next === 'dark'
+      ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+      : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+    const center = map.getCenter(), zoom = map.getZoom();
+    const { streamlineFeatures, arrowFeatures } = windDataRef.current;
+
+    map.setStyle(styleUrl);
+    map.once('style.load', () => {
+      // Re-register arrow icon
+      if (!map.hasImage('wind-arrow')) map.addImage('wind-arrow', createArrowImage(), { sdf: true });
+
+      // Re-add streamlines
+      map.addSource('wind-streamlines', { type: 'geojson', data: { type: 'FeatureCollection', features: streamlineFeatures } });
+      map.addLayer({ id: 'wind-streamlines-glow', type: 'line', source: 'wind-streamlines', paint: {
+        'line-color': ['step', ['get', 'speed'], '#22c55e', 4.47, '#84cc16', 8.94, '#eab308', 13.41, '#f97316', 17.88, '#ef4444'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.2, 8, 3.2, 11, 4.2],
+        'line-opacity': ['*', ['get', 'opacity'], 0.4], 'line-blur': 1.8,
+      }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
+      map.addLayer({ id: 'wind-streamlines', type: 'line', source: 'wind-streamlines', paint: {
+        'line-color': ['step', ['get', 'speed'], '#34d399', 4.47, '#a3e635', 8.94, '#fbbf24', 13.41, '#fb923c', 17.88, '#f87171'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 8, 1.0, 11, 1.4],
+        'line-opacity': ['*', ['get', 'opacity'], 1.2],
+      }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
+
+      // Re-add arrows
+      map.addSource('wind-points', { type: 'geojson', data: { type: 'FeatureCollection', features: arrowFeatures } });
+      map.addLayer({ id: 'wind-arrows', type: 'symbol', source: 'wind-points', layout: {
+        'icon-image': 'wind-arrow', 'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.38, 8, 0.52, 11, 0.68],
+        'icon-rotate': ['+', ['get', 'bearing'], 180], 'icon-allow-overlap': true,
+        'icon-rotation-alignment': 'map', 'icon-offset': [0, -18], 'icon-anchor': 'center',
+      }, paint: { 'icon-color': ['get', 'color'], 'icon-halo-color': 'rgba(15,25,40,0.7)', 'icon-halo-width': 0.8 } });
+      map.addLayer({ id: 'wind-badges', type: 'symbol', source: 'wind-points', layout: {
+        'text-field': ['to-string', ['get', 'speed']], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 8, 12, 11, 14],
+        'text-anchor': 'center', 'text-offset': [0, 0.4], 'text-allow-overlap': true,
+      }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(15,25,40,0.92)', 'text-halo-width': 2.2 } });
+
+      // Re-attach click
+      map.on('click', 'wind-arrows', (e) => {
+        const f = e.features?.[0]; if (!f) return;
+        setSelected({ name: f.properties.name, kind: f.properties.kind, speed: f.properties.speed,
+          bearing: f.properties.bearing, gust: f.properties.gust, color: f.properties.color });
+      });
+      map.on('mouseenter', 'wind-arrows', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'wind-arrows', () => { map.getCanvas().style.cursor = ''; });
+      map.on('click', (e) => { if (!map.queryRenderedFeatures(e.point, { layers: ['wind-arrows'] }).length) setSelected(null); });
+
+      map.jumpTo({ center, zoom });
+    });
+    setIsLight(!isLight);
+  };
+
   return (
     <div className="map-overlay">
       <div className="map-header">
@@ -493,6 +555,17 @@ export default function MunroWindMap({ onClose }) {
       </div>
 
       <div ref={containerRef} className="tile-map-viewport">
+        <div className="tile-map-controls" style={{ top: 'auto', bottom: 12, left: 12 }}>
+          <button className="tile-map-ctrl" onClick={toggleTheme} aria-label={isLight ? 'Dark map' : 'Light map'}>
+            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+              {isLight
+                ? <path d="M10 3a7 7 0 1 0 0 14 5 5 0 0 1 0-14z" fill="currentColor" />
+                : <><circle cx="10" cy="10" r="3.5" fill="currentColor" />{[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180;return <line key={a} x1={10+Math.cos(r)*5.5} y1={10+Math.sin(r)*5.5} x2={10+Math.cos(r)*7} y2={10+Math.sin(r)*7} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>})}</>
+              }
+            </svg>
+            <span>{isLight ? 'Dark' : 'Light'}</span>
+          </button>
+        </div>
         <div className="wind-field-legend">
           <div className="wind-field-legend-title">Wind speed</div>
           <div className="wind-legend-row"><span className="wind-legend-dot" style={{ background: '#22c55e' }} /> Calm · under 10 mph</div>

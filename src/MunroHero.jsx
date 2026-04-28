@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { RISK_LABELS } from './risk.js';
 
 /**
@@ -81,48 +81,9 @@ export default function MunroHero({
     return { cx, cy: daytime ? arcY + 20 : arcY + 40, daytime };
   }, [hour]);
 
-  // ─── Subtle parallax on the sun/moon only ────────────────────────────
-  const heroRef = useRef(null);
-  const [parallax, setParallax] = useState({ x: 0, y: 0 });
-  const reducedMotion = useRef(
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-
-  const onMouseMove = (e) => {
-    if (reducedMotion.current) return;
-    const rect = heroRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const px = ((e.clientX - rect.left) / rect.width - 0.5) * 2;   // -1..1
-    const py = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
-    setParallax({ x: px, y: py });
-  };
-  const onMouseLeave = () => setParallax({ x: 0, y: 0 });
-
-  // Device orientation (mobile) — subtle tilt parallax
-  useEffect(() => {
-    if (reducedMotion.current) return;
-    const handler = (e) => {
-      const x = Math.max(-15, Math.min(15, e.gamma || 0)) / 15;
-      const y = Math.max(-15, Math.min(15, (e.beta || 0) - 45)) / 15;
-      setParallax({ x, y });
-    };
-    if (typeof window !== 'undefined' && window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', handler);
-      return () => window.removeEventListener('deviceorientation', handler);
-    }
-  }, []);
-
-  // Sun/moon drifts slightly with pointer — gives a subtle sense of depth
-  const pyCelestial = parallax.y * 3;
-  const pxCelestial = parallax.x * 3;
-
   return (
     <header
       className="mhero"
-      ref={heroRef}
-      onMouseMove={onMouseMove}
-      onMouseLeave={onMouseLeave}
     >
       {/* ── Backdrop: sky + ridges in one scene ──────────────────── */}
       <svg
@@ -169,7 +130,7 @@ export default function MunroHero({
         {/* Celestial body — sun or moon. Suppressed on daily previews
             because a day-summary shouldn't pick a moment to depict. */}
         {!isDailyPreview && (
-          <g style={{ transform: `translate(${pxCelestial}px, ${pyCelestial}px)` }}>
+          <g>
             <circle
               cx={celestial.cx}
               cy={celestial.cy}

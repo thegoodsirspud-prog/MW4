@@ -582,9 +582,11 @@ function RiskHub({ activeView, midge, unitF, midgeRef }) {
           <div className="midge-segments">
             {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className="midge-segment" style={{
-                background: i <= midge.level ? '#ffffff' : 'rgba(255,255,255,0.08)',
-              opacity: i <= midge.level ? 1 : 0.4,
+                background: i <= midge.level ? '#ffffff' : 'rgba(255,255,255,0.18)',
+                opacity: 1,
+                border: '1px solid rgba(255,255,255,0.3)',
             }} />
+          ))}
           ))}
         </div>
         {midge.factors.length > 0 ? (
