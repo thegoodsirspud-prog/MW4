@@ -311,7 +311,7 @@ button { font-family: inherit; }
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 16px);
   right: 18px;
-  z-index: 30;
+  z-index: 60;
   width: 42px; height: 42px;
   background: rgba(255, 255, 255, 0.08);
   border: 0.5px solid rgba(255, 255, 255, 0.15);
@@ -337,7 +337,7 @@ button { font-family: inherit; }
   background: rgba(5, 8, 16, 0.7);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 40;
+  z-index: 70;
   animation: fade-in 0.25s ease;
 }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -346,7 +346,7 @@ button { font-family: inherit; }
   position: fixed;
   top: 0; right: 0; bottom: 0;
   width: min(320px, 85vw);
-  z-index: 41;
+  z-index: 71;
   background: rgba(12, 16, 26, 0.92) !important;
   padding: calc(env(safe-area-inset-top, 0px) + 20px) 18px 30px;
   display: flex; flex-direction: column; gap: 6px;

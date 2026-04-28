@@ -153,7 +153,7 @@ function createBadgeArrow() {
 
 // ════════════════════════════════════════════════════════════════════════
 
-export default function MunroWindMap({ onClose }) {
+export default function MunroWindMap() {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const gridRef = useRef(null);
@@ -170,7 +170,8 @@ export default function MunroWindMap({ onClose }) {
 
   // ── Layer setup (idempotent — safe to call after theme swap) ─────────
 
-  function addAllLayers(map, locFeatures) {
+  function addAllLayers(map, locFeatures, theme = 'dark') {
+    const flowColor = theme === 'light' ? '#1d4ed8' : '#ffffff';
     // Clean slate
     ['flow-arrows','wind-names','wind-badges','wind-arrows'].forEach(id => { try { map.removeLayer(id); } catch {} });
     ['flow-src','wind-points'].forEach(id => { try { map.removeSource(id); } catch {} });
@@ -192,7 +193,7 @@ export default function MunroWindMap({ onClose }) {
         'icon-padding': 0,
       },
       paint: {
-        'icon-color': '#ffffff',
+        'icon-color': flowColor,
         'icon-opacity': ['get', 'o'],
       },
     });
@@ -357,7 +358,7 @@ export default function MunroWindMap({ onClose }) {
     const onReady = () => {
       try { map.addImage('flow-arrow', createFlowArrow(), { sdf: true }); } catch {}
       try { map.addImage('badge-arrow', createBadgeArrow(), { sdf: true }); } catch {}
-      addAllLayers(map, dataRef.current);
+      addAllLayers(map, dataRef.current, next);
       map.jumpTo({ center, zoom });
       startAnimation(map);
     };
@@ -378,7 +379,6 @@ export default function MunroWindMap({ onClose }) {
              maxMph > 0 ? `Peak ${maxMph} mph across Scotland` : 'Wind across Scotland'}
           </div>
         </div>
-        <button className="map-close" onClick={onClose} aria-label="Close">✕</button>
       </div>
 
       <div ref={containerRef} className="tile-map-viewport">

@@ -68,7 +68,7 @@ function addLayers(map, theme, selName) {
   });
 }
 
-export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) {
+export default function MunroTileMap({ onSelectMunro, selectedMunro }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -181,7 +181,6 @@ export default function MunroTileMap({ onSelectMunro, selectedMunro, onClose }) 
           <div className="map-eyebrow">Scottish Munros</div>
           <div className="map-subtitle">All {MUNROS.length} peaks · tap to select</div>
         </div>
-        <button className="map-close" onClick={onClose} aria-label="Close map">✕</button>
       </div>
       <div ref={containerRef} className="tile-map-viewport">
         {/* Unified control pill */}

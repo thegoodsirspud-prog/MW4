@@ -758,97 +758,12 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
 
   const navTo = (p) => { setPage(p); setMenuOpen(false); };
 
-  // ────── Map views
-  if (page === 'map') {
-    // Provide at least the active peak's risk colour for its map dot.
-    // Full batch-fetch removed; tile map handles lazy risk colouring.
-    return (
-      <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading...</div></div></div></div>}>
-        <MunroTileMap
-          onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
-          selectedMunro={munro}
-          onClose={() => setPage('home')}
-        />
-      </Suspense>
-    );
-  }
-  if (page === 'wind') {
-    return (
-      <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Live Wind Map</div><div className="map-subtitle">Loading…</div></div><button className="map-close" onClick={() => setPage('home')} aria-label="Close map">✕</button></div></div>}>
-        <MunroWindMap onClose={() => setPage('home')} />
-      </Suspense>
-    );
-  }
-
-  // ────── Peaks full list view
-  if (page === 'peaks') {
-    return (
-      <PeaksPage
-        munros={sortedMunros}
-        currentMunro={munro}
-        regions={REGIONS}
-        onSelect={(m) => { setMunro(m); setPage('home'); }}
-        onClose={() => setPage('home')}
-      />
-    );
-  }
-
-  // ────── Loading state
-  if (loading || !activeView) {
-    return (
-      <div className="app sky-cloudy">
-        <div className="sky" />
-        <main className="content">
-          <div className="mhero mhero-loading">
-            <div className="mhero-content">
-              <div className="mhero-top">
-                <div className="mhero-eyebrow">
-                  <span className="mhero-dot" />
-                  Loading forecast…
-                </div>
-                <h1 className="mhero-peak-name">{munro.name}</h1>
-                <div className="mhero-peak-meta">
-                  <span>{munro.region}</span>
-                  <span className="mhero-peak-sep" aria-hidden="true">·</span>
-                  <span>{munro.h.toLocaleString()}m</span>
-                </div>
-              </div>
-              <div className="mhero-bottom">
-                <div className="mhero-temp-wrap">
-                  <div className="mhero-temp">
-                    <span className="mhero-temp-primary">
-                      <span className="mhero-temp-number">—</span>
-                      <span className="mhero-temp-unit">°</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // ────── Main home page
-  return (
-    <div className={`app sky-${skyType} time-${timeBand}`}>
-      <div className="sky" />
-      <div className="fx" ref={fxRef} />
-
-      <div className="mountains" aria-hidden="true">
-        <svg viewBox="0 0 480 180" preserveAspectRatio="none">
-          <path d="M0 180 L0 130 L50 90 L90 110 L140 60 L200 95 L250 70 L310 100 L370 55 L430 85 L480 70 L480 180 Z" fill="rgba(10,13,20,0.55)" />
-          <path d="M0 180 L0 150 L60 120 L120 140 L180 105 L240 130 L300 115 L370 135 L430 120 L480 130 L480 180 Z" fill="rgba(10,13,20,0.85)" />
-        </svg>
-      </div>
-
-      {/* HAMBURGER MENU BUTTON */}
+  // ── Global nav — rendered on EVERY page ──────────────────────────────
+  const globalNav = (
+    <>
       <button className="menu-btn" onClick={() => setMenuOpen(true)} aria-label="Open menu">
         <span /><span /><span />
       </button>
-
-      {/* MENU DRAWER */}
       {menuOpen && (
         <>
           <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />
@@ -893,6 +808,100 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
           </nav>
         </>
       )}
+    </>
+  );
+
+  // ────── Map views
+  if (page === 'map') {
+    return (
+      <>
+        {globalNav}
+        <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading...</div></div></div></div>}>
+          <MunroTileMap
+            onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
+            selectedMunro={munro}
+          />
+        </Suspense>
+      </>
+    );
+  }
+  if (page === 'wind') {
+    return (
+      <>
+        {globalNav}
+        <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Live Wind</div><div className="map-subtitle">Loading…</div></div></div></div>}>
+          <MunroWindMap />
+        </Suspense>
+      </>
+    );
+  }
+
+  // ────── Peaks full list view
+  if (page === 'peaks') {
+    return (
+      <>
+        {globalNav}
+        <PeaksPage
+          munros={sortedMunros}
+          currentMunro={munro}
+          regions={REGIONS}
+          onSelect={(m) => { setMunro(m); setPage('home'); }}
+        />
+      </>
+    );
+  }
+
+  // ────── Loading state
+  if (loading || !activeView) {
+    return (
+      <div className="app sky-cloudy">
+        {globalNav}
+        <div className="sky" />
+        <main className="content">
+          <div className="mhero mhero-loading">
+            <div className="mhero-content">
+              <div className="mhero-top">
+                <div className="mhero-eyebrow">
+                  <span className="mhero-dot" />
+                  Loading forecast…
+                </div>
+                <h1 className="mhero-peak-name">{munro.name}</h1>
+                <div className="mhero-peak-meta">
+                  <span>{munro.region}</span>
+                  <span className="mhero-peak-sep" aria-hidden="true">·</span>
+                  <span>{munro.h.toLocaleString()}m</span>
+                </div>
+              </div>
+              <div className="mhero-bottom">
+                <div className="mhero-temp-wrap">
+                  <div className="mhero-temp">
+                    <span className="mhero-temp-primary">
+                      <span className="mhero-temp-number">—</span>
+                      <span className="mhero-temp-unit">°</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ────── Main home page
+  return (
+    <div className={`app sky-${skyType} time-${timeBand}`}>
+      {globalNav}
+      <div className="sky" />
+      <div className="fx" ref={fxRef} />
+
+      <div className="mountains" aria-hidden="true">
+        <svg viewBox="0 0 480 180" preserveAspectRatio="none">
+          <path d="M0 180 L0 130 L50 90 L90 110 L140 60 L200 95 L250 70 L310 100 L370 55 L430 85 L480 70 L480 180 Z" fill="rgba(10,13,20,0.55)" />
+          <path d="M0 180 L0 150 L60 120 L120 140 L180 105 L240 130 L300 115 L370 135 L430 120 L480 130 L480 180 Z" fill="rgba(10,13,20,0.85)" />
+        </svg>
+      </div>
 
       <main className="content">
         {/* SEARCH — region filter has moved to the All 282 Peaks page,
@@ -1123,7 +1132,7 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
 // ════════════════════════════════════════════════════════════════════════════
 // Peaks Page (full list)
 // ════════════════════════════════════════════════════════════════════════════
-function PeaksPage({ munros, currentMunro, regions, onSelect, onClose }) {
+function PeaksPage({ munros, currentMunro, regions, onSelect }) {
   const [search, setSearch] = useState('');
   const [region, setRegion] = useState(null);
 
@@ -1144,7 +1153,6 @@ function PeaksPage({ munros, currentMunro, regions, onSelect, onClose }) {
           <div className="peaks-eyebrow">All Munros</div>
           <div className="peaks-title">{filtered.length} of {munros.length}</div>
         </div>
-        <button className="map-close" onClick={onClose} aria-label="Close">✕</button>
       </div>
 
       <div className="peaks-search-row">
