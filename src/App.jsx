@@ -5,10 +5,9 @@ import { fetchWeather } from './weather-api.js';
 import { calcRisk, riskTitle, riskDescription, calcOverallRisk, RISK_LABELS, RISK_COLORS } from './risk.js';
 import { calcMidge } from './midge.js';
 import MunroHero from './MunroHero.jsx';
-// MunroTileMap pulls in MapLibre (~200KB gzipped) — code-split so the home
-// page stays tiny. Only users who open /map pay the download cost.
-const MunroTileMap = lazy(() => import('./MunroTileMap.jsx'));
-const MunroWindMap = lazy(() => import('./MunroWindMap.jsx'));
+// MunroMap pulls in MapLibre (~200KB gzipped) — code-split so the home
+// page stays tiny. Only users who open the map pay the download cost.
+const MunroMap = lazy(() => import('./MunroMap.jsx'));
 import './App.css';
 import './MunroHero.css';
 
@@ -670,7 +669,7 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
   const [useFahrenheit, setUseFahrenheit] = useState(false);
   // Navigation
   const [menuOpen, setMenuOpen] = useState(false);
-  const [page, setPage] = useState('home'); // home | peaks | map | wind
+  const [page, setPage] = useState('home'); // home | peaks | map
 
   // Scroll targets for hero ring taps — each ring deep-links to the
   // section whose info it summarises. Refs kept at App scope so the
@@ -790,14 +789,7 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
               <div className="menu-icon">🗺️</div>
               <div>
                 <div className="menu-item-title">Munro Map</div>
-                <div className="menu-item-sub">All 282 peaks on Scotland</div>
-              </div>
-            </button>
-            <button className={`menu-item ${page === 'wind' ? 'menu-item-active' : ''}`} onClick={() => navTo('wind')}>
-              <div className="menu-icon">🌬️</div>
-              <div>
-                <div className="menu-item-title">Live Wind</div>
-                <div className="menu-item-sub">Animated wind across Scotland</div>
+                <div className="menu-item-sub">All peaks + live wind field</div>
               </div>
             </button>
             <div className="menu-footer">
@@ -811,26 +803,16 @@ function ExpandableRiskCard({ icon, eyebrow, title, desc, color, gaugeValue, gau
     </>
   );
 
-  // ────── Map views
+  // ────── Map view (unified peaks + wind)
   if (page === 'map') {
     return (
       <>
         {globalNav}
-        <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Scottish Munros</div><div className="map-subtitle">Loading...</div></div></div></div>}>
-          <MunroTileMap
+        <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Munro Map</div><div className="map-subtitle">Loading…</div></div></div></div>}>
+          <MunroMap
             onSelectMunro={(m) => { setMunro(m); setPage('home'); }}
             selectedMunro={munro}
           />
-        </Suspense>
-      </>
-    );
-  }
-  if (page === 'wind') {
-    return (
-      <>
-        {globalNav}
-        <Suspense fallback={<div className="map-overlay"><div className="map-header"><div className="map-title"><div className="map-eyebrow">Live Wind</div><div className="map-subtitle">Loading…</div></div></div></div>}>
-          <MunroWindMap />
         </Suspense>
       </>
     );
