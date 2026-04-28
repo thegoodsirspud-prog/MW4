@@ -4,13 +4,6 @@ import { lookupWMO } from './weather-codes.js';
 import { fetchWeather } from './weather-api.js';
 import { calcRisk, riskTitle, riskDescription, calcOverallRisk, RISK_LABELS, RISK_COLORS } from './risk.js';
 import { calcMidge } from './midge.js';
-import {
-  projectLatLon, projectMunro, MAP_BOUNDS,
-} from './map-projection.js';
-import {
-  scotlandOutlinePath, skyePath, mullPath, hebridesPath, orkneyPath,
-  MAP_LABELS, MAJOR_LOCHS,
-} from './scotland-geo.js';
 import MunroHero from './MunroHero.jsx';
 // MunroTileMap pulls in MapLibre (~200KB gzipped) — code-split so the home
 // page stays tiny. Only users who open /map pay the download cost.
